@@ -20,14 +20,43 @@ See example.py for example usage.
 Structure:
     1. utility functions
     2. K-FAC functions
-    3. K-FAC functions
+    3. Bayesian LoRA
 """
 
+import sys
 import logging
 import torch as t
 import torch.nn as nn
+import torch.nn.functional as F
 
+from tqdm import tqdm
+from typing import Any, Callable, Optional
 from contextlib import contextmanager
+from torch.utils.data import DataLoader
+
+# Utility functions ===========================================================
+
+
+def stabilise(K: t.Tensor, mult_eps: float, abs_eps: float) -> t.Tensor:
+    """Multiply and add the stabilisation terms `mult_eps` and `abs_eps`"""
+    eye = t.eye(K.shape[-1], dtype=K.dtype, device=K.device)
+    return K * (1.0 + mult_eps * eye) + abs_eps * eye
+
+
+def stable_cholesky(
+    K, mult_eps: float = 1e-8, abs_eps: float = 1e-8, max_tries: int = 1000
+) -> t.Tensor:
+    # NOTE: this loop rarely runs for more than 2 tries
+    # TODO: add stabilisation terms on a nonlinear schedule (i)
+    for i in range(max_tries):
+        try:
+            L = t.linalg.cholesky(stabilise(K, i * mult_eps, i * abs_eps))
+            return L
+        except t._C._LinAlgError:
+            logging.debug(f"Chokesky decomposition failed ({i})")
+            continue
+    raise ValueError(f"Could not calculate Cholesky decomposition of {K}")
+
 
 # K-FAC Section ===============================================================
 
@@ -240,3 +269,86 @@ def register_hooks(
 def remove_hooks(hooks: list):
     while len(hooks):
         hooks.pop().remove()
+
+
+def calculate_kronecker_factors(
+    model: nn.Module,
+    forward_call: Callable[[nn.Module, Any], t.Tensor],
+    loader: DataLoader,
+    n_kfac: int,
+    lr_threshold: int,
+    device: str,
+    dtype: Optional[t.dtype] = None,
+    use_tqdm: bool = False,
+) -> tuple[dict[str, t.Tensor], dict[str, t.Tensor]]:
+    """
+    Calculate the Kronecer factors, (A, S) for the likelyhood, used to
+    approximate the Gauss-Newton Hessian.
+
+    Args:
+        model: the model with LoRA adapters for which to calculate the
+            Kronecker factors
+        forward_call: A function which accepts a batch from the provided data
+            loader, and returns the resulting logits from model's predictive
+            distribution.
+        loader: a data loader on which to calculate the Kronecker factors
+        n_kfac: rank to use for the low-rank approximatino of large Kronecker
+            factor's
+        lr_threshold: the threshold beyond which a Kronecker factor is
+            considered large
+        device: device to use
+        dtype: datatype to use
+        use_tqdm: whether to show progress with TQDM
+
+    Returns:
+        1. A dictionary of activation factors
+        2. A dictionary of output gradient factors
+
+        TODO: merge these into the same dictionary?
+    """
+    model = model.train()
+
+    activations, output_grads = dict(), dict()
+    hooks, has_wide_input = register_hooks(
+        model, activations, output_grads, n_kfac, lr_threshold
+    )
+
+    for batch in tqdm(loader, disable=not use_tqdm, file=sys.stdout):
+        model.zero_grad()
+
+        logits = forward_call(model, batch)
+        assert logits.dim() == 2
+
+        with t.no_grad():
+            sampled_ys = t.multinomial(logits.softmax(-1), 1).view(-1)
+
+        pullback_loss = F.cross_entropy(logits, sampled_ys)
+
+        with disable_input_hooks():
+            pullback_loss.backward()
+
+        t.cuda.empty_cache()
+
+    # Compute the Cholesky factors for the full-rank (smaller) Kronecker
+    # factors
+    for name, A in activations.items():
+        # Activations of LoRA layers with wide inputs are low rank
+        is_low_rank = has_wide_input[name]
+        if is_low_rank:
+            activations[name] = A.to(device, dtype)
+        else:
+            L = stable_cholesky(A.to(dtype=t.float64))
+            activations[name] = L.to(device, dtype)
+
+    for name, S in output_grads.items():
+        # Output gradients of LoRA layers with wide outputs are low rank
+        is_low_rank = not has_wide_input[name]
+        if is_low_rank:
+            output_grads[name] = S.to(device, dtype)
+        else:
+            L = stable_cholesky(S.to(dtype=t.float64))
+            output_grads[name] = L.to(device, dtype)
+
+    remove_hooks(hooks)
+
+    return activations, output_grads
