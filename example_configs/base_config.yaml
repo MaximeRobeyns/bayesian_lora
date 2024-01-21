@@ -1,0 +1,23 @@
+# @package _global_
+# Baseline / default configuration to extend from for all other experiments.
+# (Include it as the first item in the defaults list; see example_usage.yaml.)
+
+notes: |-
+  Write some notes here to describe the run.
+
+# tip: will be used for paths (avoid spces and special characters)
+task_name: example
+
+# The logging level; one of CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
+log_level: INFO
+
+# optional random seed for deterministic runs
+seed: null
+
+# Whether to print out the configuration at the start of the run
+print_config: True
+
+defaults:
+  - hydra: default.yaml
+  - paths: default.yaml
+  - _self_

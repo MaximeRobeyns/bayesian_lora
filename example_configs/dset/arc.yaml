@@ -1,0 +1,8 @@
+name: arc
+max_epochs: 5
+train_bs: 32
+train_split: train
+eval_bs: 32
+eval_split: validation
+eval_subset: 1500
+max_length: 256

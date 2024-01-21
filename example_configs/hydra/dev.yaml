@@ -1,0 +1,6 @@
+run:
+  dir: ${paths.root_dir}/outputs/${task_name}/dev_run
+
+defaults:
+  - default.yaml
+  - _self_

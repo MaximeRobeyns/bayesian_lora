@@ -1,0 +1,8 @@
+_target_: peft.LoraConfig
+r: 8
+lora_alpha: 8
+lora_dropout: 0.05
+task_type: "CAUSAL_LM"
+inference_mode: false
+bias: lora_only
+# target_modules: ["c_attn", "c_proj", "c_fc", "c_proj", "lm_head"]

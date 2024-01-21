@@ -278,7 +278,7 @@ def calculate_kronecker_factors(
     n_kfac: int,
     lr_threshold: int,
     device: str,
-    dtype: Optional[t.dtype] = None,
+    dtype: t.dtype = t.float32,
     use_tqdm: bool = False,
 ) -> tuple[dict[str, t.Tensor], dict[str, t.Tensor]]:
     """
@@ -303,8 +303,7 @@ def calculate_kronecker_factors(
     Returns:
         1. A dictionary of activation factors
         2. A dictionary of output gradient factors
-
-        TODO: merge these into the same dictionary?
+        TODO: merge (A, S) into the same dictionary?
     """
     model = model.train()
 
@@ -367,6 +366,24 @@ def calc_M(
 ) -> t.Tensor | tuple[t.Tensor, tuple[t.Tensor, t.Tensor]]:
     """
     Calculates the `M` matrix in Eq. 32 of https://openreview.net/forum?id=FJiUyzOF1m
+
+    Most conventional uses of this library should not need to call this
+    function 'externally'.
+
+    Args:
+        activations: matrix of uncentred input activation covariances
+        output_grads: matrix of uncentred output gradient covariances
+        n_lora: LoRA rank
+        n_kfac: low rank to use with Kronecker factors
+        s2: prior variance
+        return_LB: whether to return the `L` and `B` matrices; where
+        - `L` is the e.g. Cholesky factorisation of small Kronecker factor with
+          shape (n_lora, n_lora), and
+        - `B` is the low-rank factorization of the large Kronecker factor with
+          shape (d, n_kfac)
+
+    Returns:
+        [TODO:description]
     """
     if activations.shape[-2:] == (n_lora, n_lora):
         L, B = (activations, output_grads)
@@ -394,6 +411,22 @@ def model_evidence(
     n_kfac: int,
     s2: t.Tensor,
 ) -> t.Tensor:
+    """
+    Use this function to calculate the marginal likelihood / model evidence;
+    for instance to tune the value of s2 (prior variance).
+
+    Args:
+        model: [TODO:description]
+        LL: [TODO:description]
+        activations: [TODO:description]
+        output_grads: [TODO:description]
+        n_lora: [TODO:description]
+        n_kfac: [TODO:description]
+        s2: [TODO:description]
+
+    Returns:
+        [TODO:description]
+    """
     logdet = 0.0
     d = 1
 

@@ -1,0 +1,8 @@
+name: rte
+max_epochs: 10
+train_bs: 16
+train_split: train
+eval_bs: 32
+eval_split: validation
+eval_subset: 1500
+max_length: 256

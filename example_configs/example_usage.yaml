@@ -1,0 +1,90 @@
+# @package _global_
+
+# 1. Load up the default component configurations
+defaults:
+  - base_config
+  - opt: adamw
+  - dset: arc # boolq
+  - llm: llama2.yaml
+  - override llm/peft: lora # unused if use_peft: None
+  - override llm/quantization: none
+  - _self_
+
+notes: |-
+  Demonstration usage for Laplace-LoRA method.
+
+log_level: INFO # DEBUG | INFO | WARN | ERROR | CRITICAL
+
+# Whether to (re)-run each of the steps (MAP training, log likelihood
+# calculation, Kronecker factor calculation, marginal likelihood tuning and
+# linearized prediction), or use existing checkpoints if present.
+run_every_step: true
+
+# Print this configuration at the start
+print_config: true
+
+# Show progress bars using tqdm
+use_tqdm: true
+
+# MAP training parameters
+map_lr: 5e-5
+train_steps: 5000
+
+# The rank used for the large Kronecker factors
+n_kfac: 10
+
+# The Kronecker factor edge size over which to use the low-rank approximation
+lr_threshold: 100
+
+# Initial variance of the prior variance (before marginal likelihood-based
+# optimisation)
+prior_var: 0.1
+
+# Used to create a unique result directory for (dataset, model) combinations
+# ('tasks')
+task_name: ${dset.name}_${llm.name}
+
+# to recover from a given checkpoint, paste the directory path here:
+hydra:
+  run:
+    dir: ${paths.root_dir}/outputs/lr_kfac/${task_name}
+
+# Random seed for reproducible runs
+seed: null
+
+# Dataset configuration overrides
+dset:
+  train_bs: 6 # 12
+  eval_bs: 5
+  train_subset: -1 # 250
+
+# keyword arguments passed to the tokenizer's `__call__` method
+tokenizer_run_kwargs:
+  padding: true
+  truncation: true
+  return_tensors: "pt"
+  max_length: 512
+
+# LLM configuration overrides
+llm:
+  use_peft: true
+  use_quant: true
+
+  model_kwargs:
+    # torch_dtype: auto # float32
+    torch_dtype: bfloat16 # Try using float32
+    low_cpu_mem_usage: true
+
+  # kwargs used when setting up the tokenizer
+  tokenizer_kwargs:
+    padding_side: left
+
+  tokenizer_special_tokens:
+    pad_token: tokenizer.bos_token
+
+  peft:
+    r: 8 # 'n_lora' the LoRA rank
+    bias: "none" # "lora_only"
+
+out_dir: null
+# out_dir: outputs/llama2_cqa

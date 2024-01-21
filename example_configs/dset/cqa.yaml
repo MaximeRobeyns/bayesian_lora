@@ -1,0 +1,8 @@
+name: cqa
+max_epochs: 4
+train_bs: 16
+train_split: train
+eval_bs: 32
+eval_split: validation
+eval_subset: -1
+max_length: 256

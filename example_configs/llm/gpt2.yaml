@@ -1,0 +1,32 @@
+name: gpt2
+model_name_or_path: gpt2
+
+config_class: AutoConfig
+config_kwargs: {}
+
+tokenizer_class: AutoTokenizer
+tokenizer_kwargs:
+  use_fast: true
+
+tokenizer_special_tokens: {}
+
+model_class: AutoModelForCausalLM
+model_kwargs:
+  torch_dtype: bfloat16 # auto
+
+# Global HF generation configurations
+global_gen_kwargs: {}
+
+add_space: true
+is_s2s: false
+
+use_peft: false
+peft:
+  target_modules: ["c_attn", "c_proj", "c_fc", "c_proj", "lm_head"]
+
+use_quant: false
+
+defaults:
+  - quantization: none
+  - peft: lora
+  - _self_

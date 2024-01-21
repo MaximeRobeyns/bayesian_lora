@@ -1,0 +1,18 @@
+# Path to the root of the repo. We just set this to the current directory,
+# since we will mostly be invoking scripts from there (Makefile, submission
+# script, manually on the CLI etc.)
+root_dir: .
+
+# Path to the data directory (useful when large datasets are stored on
+# different volumes)
+data_dir: ${paths.root_dir}/data/
+
+# Directory to use for logs (tensorboard, csv, etc)
+log_dir: ${paths.root_dir}/logs/
+
+# Can be used as a place to store any artifacts generated during the run.
+# Again, can be used to put heavy files on a separate volume or storage media.
+output_dir: ${hydra:runtime.output_dir}
+
+# Path to the working directory
+work_dir: ${hydra:runtime.cwd}

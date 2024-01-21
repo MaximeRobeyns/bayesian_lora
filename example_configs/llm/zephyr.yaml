@@ -1,0 +1,35 @@
+name: llama2
+model_name_or_path: HuggingFaceH4/zephyr-7b-beta
+
+config_class: AutoConfig
+config_kwargs: {}
+
+tokenizer_class: AutoTokenizer
+tokenizer_kwargs:
+  use_fast: true
+
+tokenizer_special_tokens: {}
+
+model_class: AutoModelForCausalLM
+model_kwargs:
+  torch_dtype: bfloat16
+
+# Global HF generation configurations
+global_gen_kwargs: {}
+
+add_space: false
+is_s2s: false
+
+use_peft: false
+peft:
+  r: 8
+  target_modules: ["q_proj", "v_proj", "lm_head"]
+  # target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj", "lm_head"]
+  bias: lora_only
+
+use_quant: false
+
+defaults:
+  - quantization: none
+  - peft: lora
+  - _self_

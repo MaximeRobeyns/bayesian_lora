@@ -1,0 +1,4 @@
+_target_: peft.AdaLoraConfig
+lora_alpha: 8
+task_type: "CAUSAL_LM"
+inference_mode: false

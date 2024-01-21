@@ -1,0 +1,9 @@
+# The output directory is generated dynamically on each run based on the task
+# name.
+run:
+  dir: ${paths.root_dir}/outputs/${task_name}/${now:%Y-%m-%d_%H-%M-%S}
+
+help:
+  app_name: "Bayesian LoRA"
+  header: "\n\nHelp Information"
+  footer: "Use --hydra-help to view Hydra specific help information"

@@ -1,0 +1,34 @@
+name: llama2
+model_name_or_path: meta-llama/Llama-2-7b-hf
+
+config_class: AutoConfig
+config_kwargs:
+  trust_remote_code: True
+
+tokenizer_class: AutoTokenizer
+tokenizer_kwargs:
+  use_fast: true
+
+tokenizer_special_tokens: {}
+
+model_class: AutoModelForCausalLM
+model_kwargs:
+  torch_dtype: bfloat16
+  low_cpu_mem_usage: true
+
+# Global HF generation configurations
+global_gen_kwargs: {}
+
+add_space: false
+is_s2s: false
+
+use_peft: false
+peft:
+  target_modules: ["q_proj", "v_proj", "lm_head"]
+
+use_quant: false
+
+defaults:
+  - quantization: none
+  - peft: lora
+  - _self_

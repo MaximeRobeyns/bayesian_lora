@@ -1,0 +1,4 @@
+_target_: transformers.utils.quantization_config.BitsAndBytesConfig
+
+load_in_4bit: false
+load_in_8bit: false
