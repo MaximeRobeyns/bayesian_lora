@@ -222,6 +222,7 @@ def register_hooks(
     model: nn.Module,
     activations: dict[str, t.Tensor],
     output_grads: dict[str, t.Tensor],
+    target_module_keywords: list[str],
     n_kfac: int = 10,
     lr_threshold: int = 100,
 ) -> tuple[list, dict]:
@@ -232,6 +233,8 @@ def register_hooks(
         model: the `nn.Module` on which to attach the hooks
         activations: dictionary in which to store the parameter activations
         output_grads: dictionary in which to store the output gradients
+        target_module_keywords: a list of the network modules to include in the
+            GGN. Note, only nn.Linear layers are currently supported.
         n_kfac: the rank we use to approximate large Kronecker factors
         lr_threshold: threshold beyond which to consider a layer's input to be
             wide (to decide whether to approximate a Kronecker factor as low
@@ -248,7 +251,9 @@ def register_hooks(
     hooks = []
     has_wide_input: dict[str, bool] = dict()
     for name, module in model.named_modules():
-        if "lora" in name.lower() and (isinstance(module, nn.Linear)):
+        if any([kw in name for kw in target_module_keywords]) and (
+            isinstance(module, nn.Linear)
+        ):
             logging.debug(f"Registering hook for module {name}")
             has_bias = hasattr(module, "bias") and module.bias is not None
             has_wide_input[name] = module.in_features > lr_threshold
@@ -279,6 +284,7 @@ def calculate_kronecker_factors(
     lr_threshold: int,
     device: str,
     dtype: t.dtype = t.float32,
+    target_module_keywords: list[str] = ["lora", "lm_head", "score"],
     use_tqdm: bool = False,
 ) -> tuple[dict[str, t.Tensor], dict[str, t.Tensor]]:
     """
@@ -298,6 +304,8 @@ def calculate_kronecker_factors(
             considered large
         device: device to use
         dtype: datatype to use
+        target_module_keywords: a list of the network modules to include in the
+            GGN. Note, only nn.Linear layers are currently supported.
         use_tqdm: whether to show progress with TQDM
 
     Returns:
@@ -309,7 +317,7 @@ def calculate_kronecker_factors(
 
     activations, output_grads = dict(), dict()
     hooks, has_wide_input = register_hooks(
-        model, activations, output_grads, n_kfac, lr_threshold
+        model, activations, output_grads, target_module_keywords, n_kfac, lr_threshold
     )
 
     for batch in tqdm(loader, disable=not use_tqdm, file=sys.stdout):
@@ -321,6 +329,7 @@ def calculate_kronecker_factors(
         with t.no_grad():
             sampled_ys = t.multinomial(logits.softmax(-1), 1).view(-1)
 
+        # TODO: support other model distributions
         pullback_loss = F.cross_entropy(logits, sampled_ys)
 
         with disable_input_hooks():
@@ -383,7 +392,7 @@ def calc_M(
           shape (d, n_kfac)
 
     Returns:
-        [TODO:description]
+        The `M` matrix, and optionally the `L` and `B` matrices too.
     """
     if activations.shape[-2:] == (n_lora, n_lora):
         L, B = (activations, output_grads)
@@ -416,16 +425,16 @@ def model_evidence(
     for instance to tune the value of s2 (prior variance).
 
     Args:
-        model: [TODO:description]
-        LL: [TODO:description]
-        activations: [TODO:description]
-        output_grads: [TODO:description]
-        n_lora: [TODO:description]
-        n_kfac: [TODO:description]
-        s2: [TODO:description]
+        model: your model
+        LL: the log likelihood on a dataset of interest
+        activations: dictionary of the 'activation' Kronecker factors
+        output_grads: dictionary of the 'output gradient' Kronecker factors
+        n_lora: LoRA rank
+        n_kfac: rank to use in low-rank approximation of large Kronecker factors
+        s2: prior variance
 
     Returns:
-        [TODO:description]
+        model evidence
     """
     logdet = 0.0
     d = 1

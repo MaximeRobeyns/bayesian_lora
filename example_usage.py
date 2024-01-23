@@ -20,18 +20,16 @@ import sys
 import peft
 import hydra
 import logging
+import importlib
 import torch as t
 import torch.nn as nn
 import torch.nn.functional as F
 
 from tqdm import tqdm
-from typing import Any, Optional
+from typing import Any
 from omegaconf import DictConfig
-from contextlib import contextmanager
 from torch.func import jacrev, functional_call
-from transformers import AutoTokenizer
 from torchmetrics import Accuracy, CalibrationError
-from torch.utils.data import DataLoader
 
 from bayesian_lora import (
     calculate_kronecker_factors,
@@ -79,6 +77,7 @@ def main(cfg: DictConfig):
     if not os.path.exists(map_param_path) or cfg.run_every_step:
         # setup optimiser
         opt_cfg = dict(cfg.opt)
+        opt_cfg |= {"weight_decay": 1 / cfg.prior_var}  # add effect of prior
         optclass = getattr(
             importlib.import_module(opt_cfg.pop("module")),
             opt_cfg.pop("classname"),
@@ -159,6 +158,7 @@ def main(cfg: DictConfig):
             cfg.lr_threshold,
             device,
             t.float32,
+            ["lora"],
             cfg.use_tqdm,
         )
         t.save({"activations": activations, "output_grads": output_grads}, kfac_path)
