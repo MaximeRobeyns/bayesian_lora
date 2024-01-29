@@ -22,7 +22,7 @@ is_s2s: false
 
 use_peft: false
 peft:
-  target_modules: ["c_attn", "c_proj", "c_fc", "c_proj", "lm_head"]
+  target_modules: ["c_attn", "c_proj", "c_fc", "lm_head"]
 
 use_quant: false
 

@@ -288,7 +288,7 @@ def calculate_kronecker_factors(
     use_tqdm: bool = False,
 ) -> tuple[dict[str, t.Tensor], dict[str, t.Tensor]]:
     """
-    Calculate the Kronecer factors, (A, S) for the likelyhood, used to
+    Calculate the Kronecer factors, (A, S) for the likelihood, used to
     approximate the Gauss-Newton Hessian.
 
     Args:
@@ -305,8 +305,12 @@ def calculate_kronecker_factors(
         device: device to use
         dtype: datatype to use
         target_module_keywords: a list of the network modules to include in the
-            GGN. Note, only nn.Linear layers are currently supported.
+            GGN.
         use_tqdm: whether to show progress with TQDM
+
+    Warning:
+        This function has only been implemented for nn.Linear. Models
+        implemented using Conv1D (e.g. GPT2) will sadly not work for now.
 
     Returns:
         1. A dictionary of activation factors

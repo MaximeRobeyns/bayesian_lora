@@ -5,7 +5,7 @@ defaults:
   - base_config
   - opt: adamw
   - dset: arc # boolq
-  - llm: llama2.yaml
+  - llm: phi.yaml
   - override llm/peft: lora # unused if use_peft: None
   - override llm/quantization: none
   - _self_
@@ -21,7 +21,7 @@ log_level: INFO # DEBUG | INFO | WARN | ERROR | CRITICAL
 run_every_step: true
 
 # Print this configuration at the start
-print_config: true
+print_config: false
 
 # Show progress bars using tqdm
 use_tqdm: true

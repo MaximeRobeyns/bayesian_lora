@@ -25,7 +25,8 @@ is_s2s: false
 use_peft: false
 peft:
   # List of all available modules to target for phi
-  target_modules: ["Wqkv", "out_proj", "fc1", "fc2", "linear"]
+  # target_modules: ["query_key_value", "dense", "fc1", "fc2", "lm_head"]
+  target_modules: ["dense", "fc1", "fc2", "lm_head"]
 
 use_quant: false
 
