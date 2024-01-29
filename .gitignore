@@ -168,3 +168,4 @@ sync
 *.ipynb
 */.ipynb_checkpoints/*
 .nbcache
+example_outputs

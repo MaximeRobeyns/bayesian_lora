@@ -18,7 +18,7 @@ log_level: INFO # DEBUG | INFO | WARN | ERROR | CRITICAL
 # Whether to (re)-run each of the steps (MAP training, log likelihood
 # calculation, Kronecker factor calculation, marginal likelihood tuning and
 # linearized prediction), or use existing checkpoints if present.
-run_every_step: true
+run_every_step: false
 
 # Print this configuration at the start
 print_config: false
@@ -28,7 +28,7 @@ use_tqdm: true
 
 # MAP training parameters
 map_lr: 5e-5
-train_steps: 5000
+train_steps: 100 #5000
 
 # The rank used for the large Kronecker factors
 n_kfac: 10
@@ -47,7 +47,7 @@ task_name: ${dset.name}_${llm.name}
 # to recover from a given checkpoint, paste the directory path here:
 hydra:
   run:
-    dir: ${paths.root_dir}/outputs/lr_kfac/${task_name}
+    dir: ${paths.root_dir}/example_outputs/${task_name}
 
 # Random seed for reproducible runs
 seed: null
@@ -55,7 +55,7 @@ seed: null
 # Dataset configuration overrides
 dset:
   train_bs: 6 # 12
-  eval_bs: 5
+  eval_bs: 4
   train_subset: -1 # 250
 
 # keyword arguments passed to the tokenizer's `__call__` method

@@ -1,5 +1,5 @@
 name: phi
-model_name_or_path: microsoft/phi-1_5
+model_name_or_path: microsoft/phi-2
 
 config_class: AutoConfig
 config_kwargs:
@@ -25,8 +25,8 @@ is_s2s: false
 use_peft: false
 peft:
   # List of all available modules to target for phi
-  # target_modules: ["query_key_value", "dense", "fc1", "fc2", "lm_head"]
-  target_modules: ["dense", "fc1", "fc2", "lm_head"]
+  # target_modules: ["q_proj", "k_proj", "v_proj", "dense", "fc1", "fc2", "lm_head"]
+  target_modules: ["q_proj", "v_proj", "lm_head"]
 
 use_quant: false
 

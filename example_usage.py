@@ -77,7 +77,8 @@ def main(cfg: DictConfig):
     if not os.path.exists(map_param_path) or cfg.run_every_step:
         # setup optimiser
         opt_cfg = dict(cfg.opt)
-        opt_cfg |= {"weight_decay": 1 / cfg.prior_var}  # add effect of prior
+        # add prior / regularization for MAP objective:
+        opt_cfg |= {"weight_decay": 1 / cfg.prior_var}
         optclass = getattr(
             importlib.import_module(opt_cfg.pop("module")),
             opt_cfg.pop("classname"),
@@ -95,8 +96,10 @@ def main(cfg: DictConfig):
                 loss = F.cross_entropy(logits[:, -1], targets.to(device))
                 assert not t.isnan(loss).any(), "NaN in loss for MAP training."
                 loss.backward()
-                opt.step(0)
+                opt.step()
                 grad_steps += 1
+                if not grad_steps < cfg.train_steps:
+                    break
         logging.info(f"Saving MAP parameters after finetuning to {map_param_path}")
         model.save_pretrained(map_param_path)
     else:
@@ -126,7 +129,7 @@ def main(cfg: DictConfig):
                 inputs = tokenizer(prompts, **cfg.tokenizer_run_kwargs).to(device)
                 logits = model(**inputs).logits[:, -1, dset.target_ids].squeeze(-1)
                 probs = logits.softmax(-1)
-                LL += probs.gather(1, classes.to(device)).sum()
+                LL += probs.gather(1, classes[:, None].to(device)).sum()
         t.save(LL, ll_path)
     else:
         logging.info(f"Loading LL from {ll_path}")
