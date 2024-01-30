@@ -138,7 +138,7 @@ def save_input_hook(
         # Select the first positional argument given to this layer (the input
         # activation), then the last token in the token sequence [:, -1]. `a`
         # should be a [batch, layer_in_dims] tensor.
-        a = pos_args[0].detach()[:, -1]
+        a = pos_args[0].clone().detach()[:, -1]
         if has_bias:
             a = t.hstack((a, t.ones_like(a[:, :1])))
         assert a.dim() == 2
@@ -168,6 +168,7 @@ def save_input_hook(
 def save_output_grad_hook(
     module_name: str,
     output_grads: dict[str, t.Tensor],
+    dtype: t.dtype = t.float32,
     n_kfac: int = 10,
     use_lr: bool = False,
     svd_dtype: t.dtype = t.float64,
@@ -194,11 +195,12 @@ def save_output_grad_hook(
         # Select the gradient of the first positional output of this layer,
         # then the last token in the token sequence [:, -1]. `s` should be a
         # [batch, layer_out_dims] tensor.
-        s = out_pos_grad[0].detach()[:, -1]
+        # s = out_pos_grad[0].detach()[:, -1]
+        s = out_pos_grad[0][:, -1].to(dtype=dtype)
         if not use_lr:
             # No LR; just do the outer product of the output gradients for all
             # elements in the batch, then sum along the batch dimension:
-            S = (s[..., None] @ s[:, None]).sum(-1)
+            S = (s[..., None] @ s[:, None]).sum(0)
             if module_name not in output_grads.keys():
                 output_grads[module_name] = S
             else:
@@ -254,17 +256,19 @@ def register_hooks(
         if any([kw in name for kw in target_module_keywords]) and (
             isinstance(module, nn.Linear)
         ):
-            logging.debug(f"Registering hook for module {name}")
+            logging.info(f"Registering hook for module {name}")
+            if name in activations.keys() or name in output_grads.keys():
+                raise Exception(f"Module of same name {name} already registered")
             has_bias = hasattr(module, "bias") and module.bias is not None
             has_wide_input[name] = module.in_features > lr_threshold
             fwd_hook = module.register_forward_pre_hook(
                 save_input_hook(
-                    name, activations, has_bias, use_lr=has_wide_input[name]
+                    name, activations, has_bias, n_kfac, use_lr=has_wide_input[name]
                 )
             )
             bwd_hook = module.register_full_backward_hook(
                 save_output_grad_hook(
-                    name, output_grads, n_kfac, not has_wide_input[name]
+                    name, output_grads, n_kfac=n_kfac, use_lr=not has_wide_input[name]
                 )
             )
             hooks.extend((fwd_hook, bwd_hook))
@@ -283,29 +287,32 @@ def calculate_kronecker_factors(
     n_kfac: int,
     lr_threshold: int,
     device: str,
-    dtype: t.dtype = t.float32,
-    target_module_keywords: list[str] = ["lora", "lm_head", "score"],
+    dtype: Optional[t.dtype] = None,
+    target_module_keywords: list[str] = ["lora"],
     use_tqdm: bool = False,
 ) -> tuple[dict[str, t.Tensor], dict[str, t.Tensor]]:
     """
     Calculate the Kronecer factors, (A, S) for the likelihood, used to
-    approximate the Gauss-Newton Hessian.
+    approximate the GGN / Fisher.
 
     Args:
-        model: the model with LoRA adapters for which to calculate the
+        model: the model with LoRA adapters, for which we are calculating the
             Kronecker factors
         forward_call: A function which accepts a batch from the provided data
-            loader, and returns the resulting logits from model's predictive
-            distribution.
-        loader: a data loader on which to calculate the Kronecker factors
+            loader, and returns the logits from model's predictive
+            distribution
+        loader: a data loader for the dataset with which to calculate the
+            curvature / Kronecker factors
         n_kfac: rank to use for the low-rank approximatino of large Kronecker
-            factor's
+            factors
         lr_threshold: the threshold beyond which a Kronecker factor is
             considered large
         device: device to use
-        dtype: datatype to use
-        target_module_keywords: a list of the network modules to include in the
-            GGN.
+        dtype: datatype to store factors in on disk. If omitted, same dtype as
+            current model parameters is used.
+        target_module_keywords: a list of keywords which identify the network
+            modules whose parameters we want to include in the Hessian
+            calculation
         use_tqdm: whether to show progress with TQDM
 
     Warning:
@@ -323,10 +330,13 @@ def calculate_kronecker_factors(
     hooks, has_wide_input = register_hooks(
         model, activations, output_grads, target_module_keywords, n_kfac, lr_threshold
     )
+    if dtype is None or not isinstance(dtype, t.dtype):
+        for p in model.parameters():
+            if p.dtype.is_floating_point:
+                dtype = p.dtype
 
     for batch in tqdm(loader, disable=not use_tqdm, file=sys.stdout):
         model.zero_grad()
-
         logits = forward_call(model, batch)
         assert logits.dim() == 2
 

@@ -140,7 +140,7 @@ def main(cfg: DictConfig):
     #
     def fwd_call(model: nn.Module, batch: Any) -> t.Tensor:
         prompts, _, _ = batch
-        tok_kwargs = cfg.tokenizer_run_kwargs | {
+        tok_kwargs = dict(cfg.tokenizer_run_kwargs) | {
             "padding": True,
             "return_tensors": "pt",
         }

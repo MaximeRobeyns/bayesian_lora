@@ -24,7 +24,7 @@ run_every_step: false
 print_config: false
 
 # Show progress bars using tqdm
-use_tqdm: true
+use_tqdm: false
 
 # MAP training parameters
 map_lr: 5e-5
