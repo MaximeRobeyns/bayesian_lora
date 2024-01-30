@@ -228,6 +228,7 @@ def register_hooks(
     target_module_keywords: list[str],
     n_kfac: Optional[int] = 10,
     lr_threshold: int = 100,
+    exclude_bias: bool = False,
 ) -> tuple[list, dict]:
     """Registers the activation and output gradient hooks.
 
@@ -248,6 +249,7 @@ def register_hooks(
             while LoRA layers with a narrow input (e.g. LoRA-B) will have a
             low-rank approximation of their output-gradient Kronecker factor,
             S.
+        exclude_bias: whether to ignore bias terms (just consider the weights)
 
     Returns:
         - a list of hooks (for later removal),
@@ -263,6 +265,8 @@ def register_hooks(
             if name in activations.keys() or name in output_grads.keys():
                 raise Exception(f"Module of same name {name} already registered")
             has_bias = hasattr(module, "bias") and module.bias is not None
+            if exclude_bias:
+                has_bias = False
             if n_kfac is None:
                 has_wide_input[name] = True
             else:
@@ -295,6 +299,7 @@ def calculate_kronecker_factors(
     device: str,
     dtype: Optional[t.dtype] = None,
     target_module_keywords: list[str] = ["lora"],
+    exclude_bias: bool = False,
     use_tqdm: bool = False,
 ) -> tuple[dict[str, t.Tensor], dict[str, t.Tensor]]:
     """
@@ -319,6 +324,7 @@ def calculate_kronecker_factors(
         target_module_keywords: a list of keywords which identify the network
             modules whose parameters we want to include in the Hessian
             calculation
+        exclude_bias: whether to ignore bias terms
         use_tqdm: whether to show progress with TQDM
 
     Warning:
@@ -334,7 +340,13 @@ def calculate_kronecker_factors(
 
     activations, output_grads = dict(), dict()
     hooks, has_wide_input = register_hooks(
-        model, activations, output_grads, target_module_keywords, n_kfac, lr_threshold
+        model,
+        activations,
+        output_grads,
+        target_module_keywords,
+        n_kfac,
+        lr_threshold,
+        exclude_bias=exclude_bias,
     )
     if dtype is None or not isinstance(dtype, t.dtype):
         for p in model.parameters():
@@ -389,6 +401,7 @@ def calculate_full_kronecker_factors(
     device: str,
     dtype: Optional[t.dtype] = None,
     target_module_keywords: list[str] = ["lora"],
+    exclude_bias: bool = False,
     use_tqdm: bool = False,
 ) -> tuple[dict[str, t.Tensor], dict[str, t.Tensor]]:
     """
@@ -407,7 +420,12 @@ def calculate_full_kronecker_factors(
 
     activations, output_grads = dict(), dict()
     hooks, _ = register_hooks(
-        model, activations, output_grads, target_module_keywords, n_kfac=None
+        model,
+        activations,
+        output_grads,
+        target_module_keywords,
+        n_kfac=None,
+        exclude_bias=exclude_bias,
     )
     if dtype is None or not isinstance(dtype, t.dtype):
         for p in model.parameters():
