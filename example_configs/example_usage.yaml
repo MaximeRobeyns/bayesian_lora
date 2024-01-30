@@ -24,11 +24,11 @@ run_every_step: false
 print_config: false
 
 # Show progress bars using tqdm
-use_tqdm: false
+use_tqdm: true
 
 # MAP training parameters
 map_lr: 5e-5
-train_steps: 100 #5000
+train_steps: 5000
 
 # The rank used for the large Kronecker factors
 n_kfac: 10
