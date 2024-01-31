@@ -3,21 +3,21 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta property="og:title" content="Writing Configurations" />
+<meta property="og:title" content="Bayesian LoRA" />
 <meta property="og:type" content="website" />
-<meta property="og:url" content="config_and_usage.html" />
+<meta property="og:url" content="index.html" />
 <meta property="og:site_name" content="bayesian_lora" />
-<meta property="og:description" content="We use use Hydra for configurations." />
+<meta property="og:description" content="This repository contains: an implementation of K-FAC, Bayesian LoRA for language models.. Installation Guide: The simplest way to use the library is to simply pip install it: Editable Installation:..." />
 <meta property="og:image:width" content="1146" />
 <meta property="og:image:height" content="600" />
-<meta property="og:image" content="/_images/social_previews/summary_config_and_usage_7bbad7f6.png" />
-<meta property="og:image:alt" content="We use use Hydra for configurations." />
-<meta name="description" content="We use use Hydra for configurations." />
+<meta property="og:image" content="/_images/social_previews/summary_index_68a86d7c.png" />
+<meta property="og:image:alt" content="This repository contains: an implementation of K-FAC, Bayesian LoRA for language models.. Installation Guide: The simplest way to use the library is to simpl..." />
+<meta name="description" content="This repository contains: an implementation of K-FAC, Bayesian LoRA for language models.. Installation Guide: The simplest way to use the library is to simply pip install it: Editable Installation:..." />
 <meta name="twitter:card" content="summary_large_image" />
-<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Machine Learning Pipeline" href="scraping/index.html" /><link rel="prev" title="Django API" href="django_api.html" />
+<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Kronecker-Factored Approximate Curvature" href="kfac.html" />
 
     <!-- Generated with Sphinx 7.2.6 and Furo 2023.09.10 -->
-        <title>Writing Configurations - Bayesian LoRA Documentation</title>
+        <title>Bayesian LoRA Documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=135e06be" />
     <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
@@ -135,7 +135,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">Bayesian LoRA Documentation</div></a>
+      <a href="#"><div class="brand">Bayesian LoRA Documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -146,7 +146,7 @@
           <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
         </button>
       </div>
-      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
         <div class="visually-hidden">Toggle table of contents sidebar</div>
         <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
       </label>
@@ -155,7 +155,7 @@
   <aside class="sidebar-drawer">
     <div class="sidebar-container">
       
-      <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="#">
   
   
   <span class="sidebar-brand-text">Bayesian LoRA Documentation</span>
@@ -167,15 +167,9 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="server_setup.html">Server Setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="django_api.html">Django API</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Writing Configurations</a></li>
-<li class="toctree-l1 has-children"><a class="reference internal" href="scraping/index.html">Machine Learning Pipeline</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Machine Learning Pipeline</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="scraping/content_crawling.html">Content Crawling</a></li>
-<li class="toctree-l2"><a class="reference internal" href="scraping/postprocessing.html">Post-Processing</a></li>
-</ul>
-</li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="kfac.html">Kronecker-Factored Approximate Curvature</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bayesian_lora.html">Bayesian Lora</a></li>
 </ul>
 
 </div>
@@ -204,19 +198,96 @@
               <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
             </button>
           </div>
-          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
             <div class="visually-hidden">Toggle table of contents sidebar</div>
             <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
           </label>
         </div>
         <article role="main">
-          <section id="writing-configurations">
-<span id="config-and-usage"></span><h1>Writing Configurations<a class="headerlink" href="#writing-configurations" title="Link to this heading">#</a></h1>
-<p>We use use <a class="reference external" href="https://hydra.cc">Hydra</a> for configurations.</p>
-<div class="admonition-todo admonition" id="id1">
-<p class="admonition-title">Todo</p>
-<p>Describe the Hydra configuration structure.</p>
+          <section id="bayesian-lora">
+<h1>Bayesian LoRA<a class="headerlink" href="#bayesian-lora" title="Link to this heading">#</a></h1>
+<p>This repository contains:</p>
+<ul class="simple">
+<li><p>an implementation of K-FAC</p></li>
+<li><p>Bayesian LoRA for language models.</p></li>
+</ul>
+<section id="installation-guide">
+<h2>Installation Guide<a class="headerlink" href="#installation-guide" title="Link to this heading">#</a></h2>
+<p>The simplest way to use the library is to simply pip install it:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">bayesian_lora</span>
+</pre></div>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The library is not yet published on PyPi.</p>
+</div>
+<section id="editable-installation">
+<h3>Editable Installation<a class="headerlink" href="#editable-installation" title="Link to this heading">#</a></h3>
+<p>If you would like to modify the library or build upon it, while keeping it as a
+separate library, then you can clone the repo and run an editable installation:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">MaximeRobeyns</span><span class="o">/</span><span class="n">bayesian_lora</span>
+<span class="n">cd</span> <span class="n">bayesian_lora</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="o">.</span>
+</pre></div>
+</div>
+</section>
+<section id="hackable-installation">
+<h3>Hackable Installation<a class="headerlink" href="#hackable-installation" title="Link to this heading">#</a></h3>
+<p>The library is currently very small, and has two core dependencies, <code class="docutils literal notranslate"><span class="pre">torch</span></code>
+and <code class="docutils literal notranslate"><span class="pre">tqdm</span></code>.</p>
+<p>To this end, feel free to directly copy the file you need into your own project
+and start hacking on it.</p>
+</section>
+<section id="installation-with-examples">
+<h3>Installation with Examples<a class="headerlink" href="#installation-with-examples" title="Link to this heading">#</a></h3>
+<p>There are some examples included with the GitHub repository. Before running the
+code in these files, you must install some additional dependencies which are
+omitted from the main library to keep it small. To do this, after cloning the
+repo, from the root simply run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="s2">&quot;.[examples]&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="development-installation">
+<h3>Development Installation<a class="headerlink" href="#development-installation" title="Link to this heading">#</a></h3>
+<p>If you plan on developing on this library, you may wish to install some
+development-related packages with <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-e</span> <span class="pre">&quot;.[dev]&quot;</span></code>. To write
+documentation, install the requirements with <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-e</span> <span class="pre">&quot;.[docs]&quot;</span></code>.</p>
+<p>For simplicity, you can also just run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="s2">&quot;.[all]&quot;</span>
+</pre></div>
+</div>
+<section id="jupyter-notebooks">
+<h4>Jupyter Notebooks<a class="headerlink" href="#jupyter-notebooks" title="Link to this heading">#</a></h4>
+<p>To test functions from a Jupyter notebook, make sure that you have installed the
+project with the <code class="docutils literal notranslate"><span class="pre">dev</span></code> dependencies. You then need to run the following
+command once to set up the iPython kernel:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">make</span> <span class="n">kernel</span>
+</pre></div>
+</div>
+<p>You only need to do this once. After you do so, you will see a new
+<code class="docutils literal notranslate"><span class="pre">bayesian_lora</span></code> kernel inside jupyterlab. To launch jupyterlab, we include a
+convenience target:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">make</span> <span class="n">lab</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="contents">
+<h2>Contents<a class="headerlink" href="#contents" title="Link to this heading">#</a></h2>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="kfac.html">Kronecker-Factored Approximate Curvature</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="kfac.html#bayesian_lora.main.calculate_kronecker_factors"><code class="docutils literal notranslate"><span class="pre">calculate_kronecker_factors()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="kfac.html#internal-functions">Internal Functions</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="bayesian_lora.html">Bayesian Lora</a></li>
+</ul>
+</div>
+</section>
 </section>
 
         </article>
@@ -224,26 +295,16 @@
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="scraping/index.html">
+          <a class="next-page" href="kfac.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Machine Learning Pipeline</div>
+                <div class="title">Kronecker-Factored Approximate Curvature</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="django_api.html">
-              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
-              <div class="page-info">
-                <div class="context">
-                  <span>Previous</span>
-                </div>
-                
-                <div class="title">Django API</div>
-                
-              </div>
-            </a>
+          
         </div>
         <div class="bottom-of-page">
           <div class="left-details">
@@ -262,8 +323,37 @@
         
       </footer>
     </div>
-    <aside class="toc-drawer no-toc">
+    <aside class="toc-drawer">
       
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Bayesian LoRA</a><ul>
+<li><a class="reference internal" href="#installation-guide">Installation Guide</a><ul>
+<li><a class="reference internal" href="#editable-installation">Editable Installation</a></li>
+<li><a class="reference internal" href="#hackable-installation">Hackable Installation</a></li>
+<li><a class="reference internal" href="#installation-with-examples">Installation with Examples</a></li>
+<li><a class="reference internal" href="#development-installation">Development Installation</a><ul>
+<li><a class="reference internal" href="#jupyter-notebooks">Jupyter Notebooks</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#contents">Contents</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
       
       
     </aside>

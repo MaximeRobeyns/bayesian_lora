@@ -1,8 +1,0 @@
-.. _config_and_usage:
-
-Writing Configurations
-----------------------
-
-We use use `Hydra <https://hydra.cc>`_ for configurations.
-
-.. todo:: Describe the Hydra configuration structure.
