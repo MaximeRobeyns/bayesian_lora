@@ -1,0 +1,40 @@
+.. _postprocessing:
+
+Post-Processing
+===============
+
+In this document, we outline the various approaches to script generaiton, topic
+discovery and so forth.
+
+Initial Approach
+----------------
+
+.. todo: review this draft as our method changes.
+
+The following is our initial approach to using the knowledgebase:
+
+1. We identify the user's interests, and record them as strings.
+
+   Note that in the future we may want to cluster based on a user preference
+   vector; rather than querying using the embeddings of some strings that a user
+   specifies, we want to use 'soft queries' that we can continuiously optimise.
+
+   An intermediate could be to learn a continuous 'padding' vector for each user
+   that perturbs the query embedding; or perhaps learn a series of such vectors.
+   This would allow us to augment and modify the user's preference vector as
+   they use the platform and provide feedback.
+
+2. At this point, rather than articulating the topics that the user is
+   interested in, we cluster the retrieved document chunks (rather their
+   embeddings) and use some technique to infer which are the most salient /
+   important / relevant.
+
+3. Given the document chunks that appear in our clusters, we compile them into a
+   formatted 'evidence' string, and provide this in the prompt to a LLM. The LLM
+   must create the podcast segment script, as well as a name for the topic
+   discussed.
+
+   When carrying out this process, it might be worth bearing in mind the set of
+   topics that the user has told us that they are explicitly interested in; such
+   that the topic summaries can have a 'spin' that appeals to what the user has
+   said that thery are interested in.
