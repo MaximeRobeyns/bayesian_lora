@@ -37,14 +37,14 @@ from bayesian_lora import (
     precision,
     stable_cholesky,
 )
-from example_utils import dsets
-from example_utils.loggers import setup_loggers
-from example_utils.setup_llm import setup_llm
+from utils import dsets
+from utils.loggers import setup_loggers
+from utils.setup_llm import setup_llm
 
 
 @hydra.main(
     version_base="1.3",
-    config_path="example_configs",
+    config_path="configs",
     config_name="example_usage",
 )
 def main(cfg: DictConfig):

@@ -19,7 +19,7 @@ import logging
 import torch as t
 import transformers
 
-from typing import Any, Optional
+from typing import Optional
 from omegaconf import OmegaConf
 from hydra.utils import instantiate
 from transformers import BitsAndBytesConfig, GenerationConfig

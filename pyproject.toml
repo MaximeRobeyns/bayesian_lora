@@ -1,0 +1,94 @@
+# Package =====================================================================
+
+[build-system]
+requires = ["setuptools >= 61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bayesian_lora"
+dynamic = ["version"] # version number is inferred in ./setup.py
+description = "Bayesian LoRA adapters for Language Models"
+authors = [
+    { name = "Maxime Robeyns", email = "dev@maximerobeyns.com" },
+]
+license = { text = "Apache-2.0" }
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["Bayes", "LLM", "LoRA", "machine learning", "uncertainty"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+# Minimal dependencies are intentionally left without version requirements,
+# since this has made past Laplace projects hard to work with...
+dependencies = [
+    "torch",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+# Dependencies for running the examples and tests
+examples = [
+    "datasets>=2.16.1",
+    "hydra-core>=1.2.0, <2.0",
+    "omegaconf>=2.3.0",
+    "peft>=0.5.0",
+    "torchmetrics>=1.2.0",
+    "transformers>=4.37.2",
+    "pytest>=7.2.0",
+]
+# Other miscellaneous dev tools
+dev = [
+    "ipywidgets>=8.0.4",
+    "jupyterlab>=3.5, <3.6",
+    "jupyterlab-vim",
+    "jupyterlab-vimrc",
+    "mypy>=0.990,<=1.0",
+    "tensorboard>=2.11.2, <3.0",
+]
+# Doc writing
+docs = [
+    "furo>=2022.9.29",
+    "sphinx-autobuild>=2021.3.14",
+    "sphinx-copybutton>=0.5.1",
+    "sphinxext-opengraph>=0.7.2",
+]
+all = ["bayesian_lora[examples]", "bayesian_lora[dev]", "bayesian_lora[docs]"]
+
+[project.urls]
+Homepage = "https://github.com/MaximeRobeyns/bayesian_lora"
+Repository = "https://github.com/MaximeRobeyns/bayesian_lora"
+Documentation = "https://maximerobeyns.github.io/bayesian_lora/"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["bayesian_lora", "bayesian_lora/*"]
+
+[tool.setuptools.package-data]
+# include any package data as a list of paths here
+bayesian_lora = [ ]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+files = "bayesian_lora/**/*.py"
+
+[tool.pytest.ini_options]
+# --ff for previously failed first
+# -l for print state on failure
+# -x for stop on first failure
+# -s for show stdout while testing
+# -v for verbose (e.g. show test names)
+# -n for n threadsafe parallel workers
+addopts = "-l -x --ff -s -v"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "slow: marks tests as slow (run with '--run-slow')",
+]

@@ -34,6 +34,15 @@ from typing import Any, Callable, Optional
 from contextlib import contextmanager
 from torch.utils.data import DataLoader
 
+__all__ = [
+    "stable_cholesky",
+    "calculate_kronecker_factors",
+    "calculate_full_kronecker_factors",
+    "model_evidence",
+    "precision",
+]
+
+
 # Utility functions ===========================================================
 
 
