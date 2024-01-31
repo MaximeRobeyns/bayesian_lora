@@ -14,9 +14,6 @@
 """
 Bayesian low-rank adaptation, using K-FAC.
 
-Copy this file into your project to hack on this library.
-See example.py for example usage.
-
 Structure:
     1. utility functions
     2. K-FAC functions
@@ -294,7 +291,12 @@ def register_hooks(
     return hooks, has_wide_input
 
 
-def remove_hooks(hooks: list):
+def remove_hooks(hooks: list) -> None:
+    """Remove the hooks from the module.
+
+    Args:
+        hooks: list of hooks, returned from `register_hooks`
+    """
     while len(hooks):
         hooks.pop().remove()
 

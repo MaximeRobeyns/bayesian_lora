@@ -1,0 +1,10 @@
+cff-version: 1.1.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Robeyns
+    given-names: Maxime
+    orcid: https://orcid.org/0000-0001-9802-9597
+title: "Bayesian LoRA"
+version: 0.0.1
+date-released: 2024-01-31
+repository-code: "https://github.com/MaximeRobeyns/bayesian_lora"
