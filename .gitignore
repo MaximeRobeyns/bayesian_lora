@@ -169,3 +169,4 @@ sync
 */.ipynb_checkpoints/*
 .nbcache
 example_outputs
+./notebooks/test_notebook.py

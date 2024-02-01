@@ -7,7 +7,7 @@ defaults:
   - dset: arc # boolq
   - llm: phi.yaml
   - override llm/peft: lora # unused if use_peft: None
-  - override llm/quantization: none
+  - override llm/quantization: 4bit
   - _self_
 
 notes: |-
@@ -28,7 +28,7 @@ use_tqdm: true
 
 # MAP training parameters
 map_lr: 5e-5
-train_steps: 5000
+train_steps: 1000
 
 # The rank used for the large Kronecker factors
 n_kfac: 10
@@ -54,7 +54,7 @@ seed: null
 
 # Dataset configuration overrides
 dset:
-  train_bs: 6 # 12
+  train_bs: 5 # 12
   eval_bs: 4
   train_subset: -1 # 250
 

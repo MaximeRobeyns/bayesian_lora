@@ -22,11 +22,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from tqdm import tqdm
+from torch import Tensor
 from typing import Any, Callable, Optional
+from jaxtyping import Float
 from contextlib import contextmanager
 from torch.linalg import LinAlgError
 from torch.utils.data import DataLoader
 from torch.utils.hooks import RemovableHandle
+
 
 __all__ = [
     "stable_cholesky",
@@ -38,15 +41,20 @@ __all__ = [
 # Utility functions ===========================================================
 
 
-def stabilise(K: t.Tensor, mult_eps: float, abs_eps: float) -> t.Tensor:
+def stabilise(
+    K: Float[Tensor, "... d d"], mult_eps: float, abs_eps: float
+) -> Float[Tensor, "... d d"]:
     """Multiply and add the stabilisation terms `mult_eps` and `abs_eps`"""
     eye = t.eye(K.shape[-1], dtype=K.dtype, device=K.device)
     return K * (1.0 + mult_eps * eye) + abs_eps * eye
 
 
 def stable_cholesky(
-    K, mult_eps: float = 1e-8, abs_eps: float = 1e-8, max_tries: int = 1000
-) -> t.Tensor:
+    K: Float[Tensor, "... d d"],
+    mult_eps: float = 1e-8,
+    abs_eps: float = 1e-8,
+    max_tries: int = 1000,
+) -> Float[Tensor, "... d d"]:
     for i in range(max_tries):
         try:
             scaled_mult_eps = mult_eps * (1.1**i)
@@ -58,6 +66,32 @@ def stable_cholesky(
             logging.debug(f"Chokesky decomposition failed ({i})")
             continue
     raise ValueError(f"Could not calculate Cholesky decomposition of {K}")
+
+
+def incremental_svd(
+    A: Float[Tensor, "d r"],
+    a: Float[Tensor, "batch d"],
+    dtype: t.dtype = t.float64,
+    n_kfac: Optional[int] = None,
+) -> Float[Tensor, "d n_kfac"]:
+    """Calculate a low-rank estimate of a big [d, d] tensor, without
+    materialising this full matrix.
+
+    Args:
+        A: The accumulated low-rank factor
+        a: a new batch of points
+        dtype: the datatype to use for the svd
+        n_kfac: (optional) specify the rank of the resulting factor. If
+            omitted, we use `r` from the `A` argument.
+            You may choose to set this higher than the final rank during the
+            accumulation.
+    """
+    if n_kfac is None:
+        n_kfac = A.size(-1)
+    a = a.to(dtype=dtype)
+    A_prime = t.hstack((A, a.T))  # [d, r+batch]
+    U, S, _ = t.linalg.svd(A_prime, full_matrices=False)
+    return U[:, :n_kfac] @ t.diag(S[:n_kfac])
 
 
 # K-FAC Section ===============================================================
@@ -158,11 +192,9 @@ def save_input_hook(
                 activations[module_name] = t.zeros(
                     a.size(-1), n_kfac, device=a.device, dtype=svd_dtype
                 )
-            a = a.to(dtype=svd_dtype)
-            # Compute an incremental SVD with a straightforward procedure
-            A_prime = t.hstack((activations[module_name], a.T))
-            U, S, _ = t.linalg.svd(A_prime, full_matrices=False)
-            activations[module_name] = U[:, :n_kfac] @ t.diag(S[:n_kfac])
+            activations[module_name] = incremental_svd(
+                activations[module_name], a, svd_dtype, n_kfac
+            )
 
     return input_hook
 
@@ -216,10 +248,9 @@ def save_output_grad_hook(
                     s.size(-1), n_kfac, device=s.device, dtype=s.dtype
                 )
             s = s.to(dtype=svd_dtype)
-            # Compute an incremental SVD with a straightforward procedure
-            S_prime = t.hstack((output_grads[module_name], s.T))
-            U, S, _ = t.linalg.svd(S_prime, full_matrices=False)
-            output_grads[module_name] = U[:, :n_kfac] @ t.diag(S[:n_kfac])
+            output_grads[module_name] = incremental_svd(
+                output_grads[module_name], s, svd_dtype, n_kfac
+            )
 
     return output_grad_hook
 
@@ -409,65 +440,65 @@ def calculate_kronecker_factors(
     return factors
 
 
-# def calculate_full_kronecker_factors(
-#     model: nn.Module,
-#     forward_call: Callable[[nn.Module, Any], t.Tensor],
-#     loader: DataLoader,
-#     device: str,
-#     dtype: Optional[t.dtype] = None,
-#     target_module_keywords: list[str] = ["lora"],
-#     exclude_bias: bool = False,
-#     use_tqdm: bool = False,
-# ) -> tuple[dict[str, t.Tensor], dict[str, t.Tensor]]:
-#     """
-#     WARNING: deprecated. Will be merged into calculate_kronecker_factors in the
-#     future.
-#
-#     Full rank variant of the above. See calculate_kronecker_factors for
-#     arguments.
-#
-#     Warning:
-#         This function has only been implemented for nn.Linear. Models
-#         implemented using Conv1D (e.g. GPT2) will sadly not work for now.
-#
-#     Returns:
-#         1. A dictionary of activation factors
-#         2. A dictionary of output gradient factors
-#     """
-#     model = model.train()
-#
-#     activations, output_grads = dict(), dict()
-#     hooks, _ = register_hooks(
-#         model,
-#         activations,
-#         output_grads,
-#         target_module_keywords,
-#         n_kfac=None,
-#         exclude_bias=exclude_bias,
-#     )
-#     if dtype is None or not isinstance(dtype, t.dtype):
-#         for p in model.parameters():
-#             if p.dtype.is_floating_point:
-#                 dtype = p.dtype
-#
-#     for batch in tqdm(loader, disable=not use_tqdm, file=sys.stdout):
-#         model.zero_grad()
-#         logits = forward_call(model, batch)
-#         assert logits.dim() == 2
-#
-#         with t.no_grad():
-#             sampled_ys = t.multinomial(logits.softmax(-1), 1).view(-1)
-#
-#         pullback_loss = F.cross_entropy(logits, sampled_ys)
-#
-#         with disable_input_hooks():
-#             pullback_loss.backward()
-#
-#         t.cuda.empty_cache()
-#
-#     activations = {n: A.to(device, dtype) for n, A in activations.items()}
-#     output_grads = {n: S.to(device, dtype) for n, S in output_grads.items()}
-#
-#     remove_hooks(hooks)
-#
-#     return activations, output_grads
+def calculate_full_kronecker_factors(
+    model: nn.Module,
+    forward_call: Callable[[nn.Module, Any], t.Tensor],
+    loader: DataLoader,
+    device: str,
+    dtype: Optional[t.dtype] = None,
+    target_module_keywords: list[str] = ["lora"],
+    exclude_bias: bool = False,
+    use_tqdm: bool = False,
+) -> tuple[dict[str, t.Tensor], dict[str, t.Tensor]]:
+    """
+    WARNING: deprecated. Will be merged into calculate_kronecker_factors in the
+    future.
+
+    Full rank variant of the above. See calculate_kronecker_factors for
+    arguments.
+
+    Warning:
+        This function has only been implemented for nn.Linear. Models
+        implemented using Conv1D (e.g. GPT2) will sadly not work for now.
+
+    Returns:
+        1. A dictionary of activation factors
+        2. A dictionary of output gradient factors
+    """
+    model = model.train()
+
+    activations, output_grads = dict(), dict()
+    hooks, _ = register_hooks(
+        model,
+        activations,
+        output_grads,
+        target_module_keywords,
+        n_kfac=None,
+        exclude_bias=exclude_bias,
+    )
+    if dtype is None or not isinstance(dtype, t.dtype):
+        for p in model.parameters():
+            if p.dtype.is_floating_point:
+                dtype = p.dtype
+
+    for batch in tqdm(loader, disable=not use_tqdm, file=sys.stdout):
+        model.zero_grad()
+        logits = forward_call(model, batch)
+        assert logits.dim() == 2
+
+        with t.no_grad():
+            sampled_ys = t.multinomial(logits.softmax(-1), 1).view(-1)
+
+        pullback_loss = F.cross_entropy(logits, sampled_ys)
+
+        with disable_input_hooks():
+            pullback_loss.backward()
+
+        t.cuda.empty_cache()
+
+    activations = {n: A.to(device, dtype) for n, A in activations.items()}
+    output_grads = {n: S.to(device, dtype) for n, S in output_grads.items()}
+
+    remove_hooks(hooks)
+
+    return activations, output_grads

@@ -7,7 +7,7 @@ import torch as t
 
 from torch.linalg import LinAlgError
 
-from bayesian_lora.kfac import stable_cholesky
+from bayesian_lora.kfac import stable_cholesky, incremental_svd
 
 
 def test_ill_conditioned_matrix():
@@ -55,5 +55,10 @@ def test_zero_matrix():
     assert not t.isnan(L).any()
 
 
-# TODO: test incremental SVD
-# TODO: test hook registration
+def test_incremental_svd():
+    d, n_kfac, batch = 1024, 10, 16
+    A = t.randn(d, n_kfac)
+    a = t.randn(batch, d)
+    B = incremental_svd(A, a)
+    assert A.shape == B.shape
+    assert not t.isnan(B).any()

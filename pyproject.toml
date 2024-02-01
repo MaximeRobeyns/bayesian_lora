@@ -26,6 +26,7 @@ classifiers = [
 # Minimal dependencies are intentionally left without version requirements,
 # since this has made past Laplace projects hard to work with...
 dependencies = [
+    "jaxtyping>=0.2.25",
     "torch",
     "tqdm",
 ]
