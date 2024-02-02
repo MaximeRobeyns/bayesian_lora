@@ -7,12 +7,14 @@
 <meta property="og:type" content="website" />
 <meta property="og:url" content="bayesian_lora.html" />
 <meta property="og:site_name" content="bayesian_lora" />
+<meta property="og:description" content="This file contains the main methods relating to the Bayesian Low-Rank Adaptation for Large Language Models paper. Namely, calculating the model evidence for tuning prior and network hyperparameters..." />
 <meta property="og:image:width" content="1146" />
 <meta property="og:image:height" content="600" />
-<meta property="og:image" content="/_images/social_previews/summary_bayesian_lora_29e68334.png" />
-<meta property="og:image:alt" content="" />
+<meta property="og:image" content="/None" />
+<meta property="og:image:alt" content="This file contains the main methods relating to the Bayesian Low-Rank Adaptation for Large Language Models paper. Namely, calculating the model evidence for..." />
+<meta name="description" content="This file contains the main methods relating to the Bayesian Low-Rank Adaptation for Large Language Models paper. Namely, calculating the model evidence for tuning prior and network hyperparameters..." />
 <meta name="twitter:card" content="summary_large_image" />
-<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Kronecker-Factored Approximate Curvature" href="kfac.html" />
+<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Example Usage" href="example_usage.html" /><link rel="prev" title="K-FAC Methods" href="kfac.html" />
 
     <!-- Generated with Sphinx 7.2.6 and Furo 2023.09.10 -->
         <title>Bayesian Lora - Bayesian LoRA Documentation</title>
@@ -144,7 +146,7 @@
           <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
         </button>
       </div>
-      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
         <div class="visually-hidden">Toggle table of contents sidebar</div>
         <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
       </label>
@@ -166,8 +168,9 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="kfac.html">Kronecker-Factored Approximate Curvature</a></li>
+<li class="toctree-l1"><a class="reference internal" href="kfac.html">K-FAC Methods</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Bayesian Lora</a></li>
+<li class="toctree-l1"><a class="reference internal" href="example_usage.html">Example Usage</a></li>
 </ul>
 
 </div>
@@ -196,7 +199,7 @@
               <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
             </button>
           </div>
-          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
             <div class="visually-hidden">Toggle table of contents sidebar</div>
             <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
           </label>
@@ -204,6 +207,67 @@
         <article role="main">
           <section id="bayesian-lora">
 <span id="id1"></span><h1>Bayesian Lora<a class="headerlink" href="#bayesian-lora" title="Link to this heading">#</a></h1>
+<p>This file contains the main methods relating to the <a class="reference external" href="https://openreview.net/forum?id=FJiUyzOF1m">Bayesian Low-Rank
+Adaptation for Large Language Models</a> paper. Namely, calculating the
+model evidence for tuning prior and network hyperparameters and calculating the
+posterior precision for making (linearised) predictions.</p>
+<section id="model-evidence">
+<h2>Model Evidence<a class="headerlink" href="#model-evidence" title="Link to this heading">#</a></h2>
+<p>The model evidence, or marginal likelihood, is a scalar value that indicates the
+evidence provided by the data for a particular model. A model with a higher
+marginal likelihood is considered more supported by the data under the given
+prior.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="bayesian_lora.main.model_evidence">
+<span class="sig-prename descclassname"><span class="pre">bayesian_lora.main.</span></span><span class="sig-name descname"><span class="pre">model_evidence</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">LL</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_grads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_lora</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_kfac</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="headerlink" href="#bayesian_lora.main.model_evidence" title="Link to this definition">#</a></dt>
+<dd><p>Use this function to calculate the marginal likelihood / model evidence;
+for instance to tune the value of s2 (prior variance).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> – your model</p></li>
+<li><p><strong>LL</strong> – the log likelihood on a dataset of interest</p></li>
+<li><p><strong>activations</strong> – dictionary of the ‘activation’ Kronecker factors</p></li>
+<li><p><strong>output_grads</strong> – dictionary of the ‘output gradient’ Kronecker factors</p></li>
+<li><p><strong>n_lora</strong> – LoRA rank</p></li>
+<li><p><strong>n_kfac</strong> – rank to use in low-rank approximation of large Kronecker factors</p></li>
+<li><p><strong>s2</strong> – prior variance</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>model evidence</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="posterior-precision">
+<h2>Posterior Precision<a class="headerlink" href="#posterior-precision" title="Link to this heading">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="bayesian_lora.main.precision">
+<span class="sig-prename descclassname"><span class="pre">bayesian_lora.main.</span></span><span class="sig-name descname"><span class="pre">precision</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jacobian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_grads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_logits</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_lora</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_kfac</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#bayesian_lora.main.precision" title="Link to this definition">#</a></dt>
+<dd><p>Calculates the precision matrix for performing (linearised) prediction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inputs</strong> (<em>dict</em>) – tokenized batch of inputs (returned from a HF Tokenizer)</p></li>
+<li><p><strong>jacobian</strong> (<em>dict</em>) – a dictionary of first derivatives for each of the
+target module’s parameters</p></li>
+<li><p><strong>activations</strong> – dictionary of the ‘activation’ Kronecker factors</p></li>
+<li><p><strong>output_grads</strong> – dictionary of the ‘output gradient’ Kronecker factors</p></li>
+<li><p><strong>s2</strong> – prior variance (scalar valued tensor)</p></li>
+<li><p><strong>n_logits</strong> – the number of  logits to predict (e.g. the number of classes
+in your Categorical likelihood)</p></li>
+<li><p><strong>n_lora</strong> – rank used in the LoRA adapters</p></li>
+<li><p><strong>n_kfac</strong> – rank used for the low-rank approximation of large Kronekcer
+factors</p></li>
+<li><p><strong>device</strong> – device on which to accumulate the precision matrix</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
 </section>
 
         </article>
@@ -211,7 +275,15 @@
       <footer>
         
         <div class="related-pages">
-          
+          <a class="next-page" href="example_usage.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Example Usage</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
           <a class="prev-page" href="kfac.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
@@ -219,7 +291,7 @@
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Kronecker-Factored Approximate Curvature</div>
+                <div class="title">K-FAC Methods</div>
                 
               </div>
             </a>
@@ -241,8 +313,34 @@
         
       </footer>
     </div>
-    <aside class="toc-drawer no-toc">
+    <aside class="toc-drawer">
       
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Bayesian Lora</a><ul>
+<li><a class="reference internal" href="#model-evidence">Model Evidence</a><ul>
+<li><a class="reference internal" href="#bayesian_lora.main.model_evidence"><code class="docutils literal notranslate"><span class="pre">model_evidence()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#posterior-precision">Posterior Precision</a><ul>
+<li><a class="reference internal" href="#bayesian_lora.main.precision"><code class="docutils literal notranslate"><span class="pre">precision()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
       
       
     </aside>

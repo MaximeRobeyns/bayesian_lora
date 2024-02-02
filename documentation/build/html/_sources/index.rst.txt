@@ -83,6 +83,7 @@ Contents
 
    kfac
    bayesian_lora
+   example_usage
 
 ..
     Indices and tables
