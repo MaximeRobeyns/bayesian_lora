@@ -34,7 +34,7 @@ from torch.utils.hooks import RemovableHandle
 __all__ = [
     "stable_cholesky",
     "calculate_kronecker_factors",
-    # "calculate_full_kronecker_factors",
+    "calculate_full_kronecker_factors",
 ]
 
 
@@ -450,21 +450,32 @@ def calculate_full_kronecker_factors(
     exclude_bias: bool = False,
     use_tqdm: bool = False,
 ) -> tuple[dict[str, t.Tensor], dict[str, t.Tensor]]:
-    """
-    WARNING: deprecated. Will be merged into calculate_kronecker_factors in the
-    future.
+    """Full-rank Kronecker factor calculation
 
-    Full rank variant of the above. See calculate_kronecker_factors for
-    arguments.
-
-    Warning:
-        This function has only been implemented for nn.Linear. Models
-        implemented using Conv1D (e.g. GPT2) will sadly not work for now.
+    Args:
+        model: the model with LoRA adapters, for which we are calculating the
+            Kronecker factors
+        forward_call: A function which accepts a batch from the provided data
+            loader, and returns the logits from model's predictive
+            distribution
+        loader: a data loader for the dataset with which to calculate the
+            curvature / Kronecker factors
+        device: device to use
+        dtype: datatype to store factors in on disk. If omitted, same dtype as
+            current model parameters is used.
+        target_module_keywords: a list of keywords which identify the network
+            modules whose parameters we want to include in the Hessian
+            calculation
+        exclude_bias: whether to ignore bias terms
+        use_tqdm: whether to show progress with TQDM
 
     Returns:
-        1. A dictionary of activation factors
-        2. A dictionary of output gradient factors
+        A dictionary containing the Kronecker factors; keyed by module name,
+        containing a tuple (A, S) with the activation factor (A) as the first
+        element, and the output gradient factor (S) as the second element.
     """
+    # TODO: wrap `calculate_kronecker_factors`; passing in appropriate arguments
+
     model = model.train()
 
     activations, output_grads = dict(), dict()

@@ -130,7 +130,21 @@ def precision(
     device: str,
 ):
     """
-    Calculates the precision matrix for linearized prediction.
+    Calculates the precision matrix for performing (linearised) prediction.
+
+    Args:
+        inputs (dict): tokenized batch of inputs (returned from a HF Tokenizer)
+        jacobian (dict): a dictionary of first derivatives for each of the
+            target module's parameters
+        activations: dictionary of the 'activation' Kronecker factors
+        output_grads: dictionary of the 'output gradient' Kronecker factors
+        s2: prior variance (scalar valued tensor)
+        n_logits: the number of  logits to predict (e.g. the number of classes
+            in your Categorical likelihood)
+        n_lora: rank used in the LoRA adapters
+        n_kfac: rank used for the low-rank approximation of large Kronekcer
+            factors
+        device: device on which to accumulate the precision matrix
     """
 
     batch_size = inputs.input_ids.size(0)
