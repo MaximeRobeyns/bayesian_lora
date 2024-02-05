@@ -33,6 +33,7 @@ from torchmetrics import Accuracy, CalibrationError
 
 from bayesian_lora import (
     calculate_kronecker_factors,
+    cholesky_decompose_small_factors,
     model_evidence,
     precision,
     stable_cholesky,
@@ -92,7 +93,13 @@ def main(cfg: DictConfig):
                 opt.zero_grad()
                 prompts, _, targets = batch
                 inputs = tokenizer(prompts, **cfg.tokenizer_run_kwargs).to(device)
-                logits = model(**inputs).logits
+
+                with t.backends.cuda.sdp_kernel(
+                    enable_flash=has_flash,
+                    enable_math=False,
+                    enable_mem_efficient=False,
+                ):
+                    logits = model(**inputs).logits
                 loss = F.cross_entropy(logits[:, -1], targets.to(device))
                 assert not t.isnan(loss).any(), "NaN in loss for MAP training."
                 loss.backward()
@@ -127,7 +134,12 @@ def main(cfg: DictConfig):
             for batch in tqdm(val_loader, disable=not cfg.use_tqdm, file=sys.stdout):
                 prompts, classes, _ = batch
                 inputs = tokenizer(prompts, **cfg.tokenizer_run_kwargs).to(device)
-                logits = model(**inputs).logits[:, -1, dset.target_ids].squeeze(-1)
+                with t.backends.cuda.sdp_kernel(
+                    enable_flash=has_flash,
+                    enable_math=False,
+                    enable_mem_efficient=False,
+                ):
+                    logits = model(**inputs).logits[:, -1, dset.target_ids].squeeze(-1)
                 probs = logits.softmax(-1)
                 LL += probs.gather(1, classes[:, None].to(device)).sum()
         t.save(LL, ll_path)
@@ -145,7 +157,12 @@ def main(cfg: DictConfig):
             "return_tensors": "pt",
         }
         inputs = tokenizer(prompts, **tok_kwargs).to(device)
-        outputs = model(**inputs)
+        with t.backends.cuda.sdp_kernel(
+            enable_flash=has_flash,
+            enable_math=False,
+            enable_mem_efficient=False,
+        ):
+            outputs = model(**inputs)
         logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
         logits = logits.reshape(-1, logits.size(-1))
         return logits
@@ -153,22 +170,24 @@ def main(cfg: DictConfig):
     kfac_path = f"{cfg.paths.output_dir}/kronecker_factors.pth"
     if not os.path.exists(kfac_path) or cfg.run_every_step:
         logging.info("Computing the low-rank Kronecker factors")
-        activations, output_grads = calculate_kronecker_factors(
+        factors = calculate_kronecker_factors(
             model,
             fwd_call,
             train_loader,
             cfg.n_kfac,
             cfg.lr_threshold,
-            device,
-            t.float32,
             ["lora"],
             cfg.use_tqdm,
         )
-        t.save({"activations": activations, "output_grads": output_grads}, kfac_path)
+        # Calculate Cholesky decomposition of the smaller factors
+        factors = cholesky_decompose_small_factors(
+            factors, cfg.lr_threshold, device, t.float32
+        )
+        t.save({"factors": factors}, kfac_path)
     else:
         logging.info(f"Loading low-rank Kronecker factors from {kfac_path}")
         kfactors = t.load(kfac_path)
-        activations, output_grads = kfactors["activations"], kfactors["output_grads"]
+        factors = kfactors["factors"]
 
     #
     # 6. Use the marginal likelihood to optimise the prior variance
@@ -181,9 +200,7 @@ def main(cfg: DictConfig):
 
         for _ in range(200):
             opt.zero_grad()
-            loss = model_evidence(
-                model, LL, activations, output_grads, cfg.llm.peft.r, cfg.n_kfac, s2
-            )
+            loss = model_evidence(model, LL, factors, cfg.llm.peft.r, cfg.n_kfac, s2)
             loss.backward()
             t.nn.utils.clip_grad_norm_(s2, 1.0)
             opt.step()
@@ -260,8 +277,7 @@ def main(cfg: DictConfig):
             f_var = precision(
                 inputs,
                 jacobian,
-                activations,
-                output_grads,
+                factors,
                 s2,
                 dset.n_labels,
                 cfg.llm.peft.r,
@@ -299,4 +315,11 @@ def main(cfg: DictConfig):
 
 
 if __name__ == "__main__":
+    try:
+        import flash_attn
+
+        has_flash = True
+    except Exception:
+        has_flash = False
+
     main()

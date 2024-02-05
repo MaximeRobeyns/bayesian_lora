@@ -19,7 +19,9 @@ import logging
 import torch as t
 import torch.nn as nn
 
-__all__ = ["model_evidence", "precision"]
+from bayesian_lora.kfac import stable_cholesky, KFAC_t
+
+__all__ = ["model_evidence", "precision", "cholesky_decompose_small_factors"]
 
 
 def calc_M(
@@ -68,11 +70,35 @@ def calc_M(
     return M
 
 
+def cholesky_decompose_small_factors(
+    factors: KFAC_t, lr_threshold: int, device: str, dtype: t.dtype
+) -> KFAC_t:
+    """
+    Compute the Cholesky factors for the full-rank (smaller) Kronecker
+    factors
+
+    Args:
+        factors (dict[str, tuple[t.Tensor, t.Tensor]]): the Kronecker factors
+        lr_threshold: the threshold beyond which a Kronecker factor is
+            considered large and a low-rank approximation is applied.
+        device: device to use
+        dtype: datatype to store factors in on disk
+    Returns:
+        Kronecker factors, with small factors Cholesky decomposed.
+    """
+    for name, (A, S) in factors.items():
+        if A.size(0) < lr_threshold:
+            A = stable_cholesky(A.to(dtype=t.float64))
+        if S.size(0) < lr_threshold:
+            S = stable_cholesky(S.to(dtype=t.float64))
+        factors[name] = (A.to(device, dtype), S.to(device, dtype))
+    return factors
+
+
 def model_evidence(
     model: nn.Module,
     LL: t.Tensor,
-    activations: dict[str, t.Tensor],
-    output_grads: dict[str, t.Tensor],
+    factors: KFAC_t,
     n_lora: int,
     n_kfac: int,
     s2: t.Tensor,
@@ -84,8 +110,7 @@ def model_evidence(
     Args:
         model: your model
         LL: the log likelihood on a dataset of interest
-        activations: dictionary of the 'activation' Kronecker factors
-        output_grads: dictionary of the 'output gradient' Kronecker factors
+        factors: dictionary of Kronecker factors
         n_lora: LoRA rank
         n_kfac: rank to use in low-rank approximation of large Kronecker factors
         s2: prior variance
@@ -96,8 +121,7 @@ def model_evidence(
     logdet = t.tensor(0.0)
     d = 1
 
-    for layer_name, A in activations.items():
-        S = output_grads[layer_name]
+    for (A, S) in factors.values():
         d = max(A.shape + S.shape)
 
         M = calc_M(A, S, n_lora, n_kfac, s2)
@@ -121,8 +145,7 @@ def model_evidence(
 def precision(
     inputs,
     jacobian,
-    activations: dict[str, t.Tensor],
-    output_grads: dict[str, t.Tensor],
+    factors: KFAC_t,
     s2: t.Tensor,
     n_logits: int,
     n_lora: int,
@@ -136,8 +159,7 @@ def precision(
         inputs (dict): tokenized batch of inputs (returned from a HF Tokenizer)
         jacobian (dict): a dictionary of first derivatives for each of the
             target module's parameters
-        activations: dictionary of the 'activation' Kronecker factors
-        output_grads: dictionary of the 'output gradient' Kronecker factors
+        factors: dictionary of Kronecker factors
         s2: prior variance (scalar valued tensor)
         n_logits: the number of  logits to predict (e.g. the number of classes
             in your Categorical likelihood)
@@ -152,9 +174,9 @@ def precision(
     # initialise a matrix to accumulate the result
     precision = t.zeros((batch_size, n_logits, n_logits), device=device)
 
-    # Iterate over the layers; `k` is the layer name / key, `Act` is the input
-    # activations.
-    for k, A in activations.items():
+    # Iterate over the layers; `k` is the layer name / key, `A` is the input
+    # activations and `S` are the output gradients.
+    for k, (A, S) in factors.items():
         # Jacobian term
         g_key = k + ".weight"
         G = jacobian.get(g_key).squeeze()
@@ -168,7 +190,6 @@ def precision(
         term_1 = s2 * G_vec @ G_vec.mT
         assert term_1.shape == (batch_size, n_logits, n_logits)
 
-        S = output_grads[k]
         M, (L, B) = calc_M(A, S, n_lora, n_kfac, s2, return_LB=True)
         M_size = n_kfac * n_lora
         assert M.shape == (M_size, M_size)

@@ -23,7 +23,7 @@ import torch.nn.functional as F
 
 from tqdm import tqdm
 from torch import Tensor
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 from jaxtyping import Float
 from contextlib import contextmanager
 from torch.linalg import LinAlgError
@@ -34,7 +34,9 @@ from torch.utils.hooks import RemovableHandle
 __all__ = [
     "stable_cholesky",
     "calculate_kronecker_factors",
-    "calculate_full_kronecker_factors",
+    "activation_t",
+    "outgrad_t",
+    "KFAC_t",
 ]
 
 
@@ -72,7 +74,7 @@ def incremental_svd(
     A: Float[Tensor, "d r"],
     a: Float[Tensor, "batch d"],
     dtype: t.dtype = t.float64,
-    n_kfac: Optional[int] = None,
+    n_kfac: int | None = None,
 ) -> Float[Tensor, "d n_kfac"]:
     """Calculate a low-rank estimate of a big [d, d] tensor, without
     materialising this full matrix.
@@ -96,11 +98,17 @@ def incremental_svd(
 
 # K-FAC Section ===============================================================
 
+# Datatype for Kronecker factors. l_in, l_out refers to the number of input and
+# output features of layer l in the network, respectively. Note, if the layer
+# has a bias, then l_in will in fact bt l_in + 1.
+activation_t = Float[Tensor, "l_in l_in_or_n_kfac"]
+outgrad_t = Float[Tensor, "l_out l_out_or_n_kfac"]
+KFAC_t = dict[str, tuple[activation_t, outgrad_t]]
+
 # We add hooks to the nn.Module (e.g. AutoModelForCausalLM, PeftModel, etc) to
 # keep track of each layer's input activations and output gradients.
 # The following context managers let you enable / disable them without removing
 # them.
-
 _hooks_enabled: bool = True
 _input_hooks_disabled: bool = False
 
@@ -146,10 +154,10 @@ def disable_input_hooks():
 
 def save_input_hook(
     module_name: str,
-    activations: dict[str, t.Tensor],
+    activations: dict[str, activation_t],
+    n_kfac: int | None,
+    lr_threshold: int,
     has_bias: bool = False,
-    n_kfac: Optional[int] = 10,
-    use_lr: bool = False,
     svd_dtype: t.dtype = t.float64,
 ):
     """A closure which returns a new hook to capture a layer's input
@@ -161,10 +169,11 @@ def save_input_hook(
             more portable.
         activations: mapping from layer / module name to input activation
             Kronecker factor
-        has_bias: does this layer have a bias?
         n_kfac: the rank we use if we're using a low rank appproximation to
             this Kronecker factor
-        use_lr: are we using a low-rank approximation to this Kronecker factor?
+        lr_threshold: if the side length `l_in+1` exceeds this threshold, and
+            n_kfac is not none, treat the factor as low-rank
+        has_bias: does this layer have a bias?
         svd_dtype: dtype to cast tensors to for SVD calculations
     """
 
@@ -173,14 +182,15 @@ def save_input_hook(
             return
         # Select the first positional argument given to this layer (the input
         # activation), then the last token in the token sequence [:, -1]. `a`
-        # should be a [batch, layer_in_dims] tensor.
-        a = pos_args[0].clone().detach()[:, -1]
+        # should be a [batch, l_in] tensor.
+        a: Float[Tensor, "batch l_in"] = pos_args[0].detach().clone()[:, -1]
         if has_bias:
             a = t.hstack((a, t.ones_like(a[:, :1])))
         assert a.dim() == 2
-        if not use_lr or n_kfac is None:
-            # No LR; just do the outer product of activations for all elements
-            # in the batch, then sum along the batch dimension:
+        if a.size(-1) < lr_threshold or n_kfac is None:
+            # We're not using a low-rank approximation for this factor; just do
+            # the outer product of the activations for all the elements in the
+            # batch, then sum along batch dim:
             A = (a[..., None] @ a[:, None]).sum(0)
             if module_name not in activations.keys():
                 activations[module_name] = A
@@ -201,10 +211,9 @@ def save_input_hook(
 
 def save_output_grad_hook(
     module_name: str,
-    output_grads: dict[str, t.Tensor],
-    dtype: t.dtype = t.float32,
-    n_kfac: Optional[int] = 10,
-    use_lr: bool = False,
+    output_grads: dict[str, outgrad_t],
+    n_kfac: int | None,
+    lr_threshold: int,
     svd_dtype: t.dtype = t.float64,
 ):
     """A closure which returns a new hook to capture a layer's output
@@ -218,23 +227,24 @@ def save_output_grad_hook(
             Kronecker factor.
         n_kfac: the rank we use if we're using a low rank appproximation to
             this Kronecker factor
-        use_lr: are we using a low-rank approximation to this Kronecker factor?
+        lr_threshold: if the side length `l_in+1` exceeds this threshold, and
+            n_kfac is not none, treat the factor as low-rank
         svd_dtype: dtype to cast tensors to for SVD calculations
     """
 
-    def output_grad_hook(_module: nn.Module, _, out_pos_grad: tuple[t.Tensor]) -> None:
+    def output_grad_hook(_module: nn.Module, _, out_pos_grad: tuple[Tensor]) -> None:
         if not _hooks_enabled:
             return
 
         # Select the gradient of the first positional output of this layer,
         # then the last token in the token sequence [:, -1]. `s` should be a
-        # [batch, layer_out_dims] tensor.
-        # TODO: detach or not here?
-        # s = out_pos_grad[0].detach()[:, -1]
-        s = out_pos_grad[0][:, -1].to(dtype=dtype)
-        if not use_lr or n_kfac is None:
-            # No LR; just do the outer product of the output gradients for all
-            # elements in the batch, then sum along the batch dimension:
+        # [batch, l_out] tensor.
+        s: Float[Tensor, "batch l_out"] = out_pos_grad[0].detach().clone()[:, -1]
+        if s.size(-1) < lr_threshold or n_kfac is None:
+            # We're not using a low-rank approximation for this factor; just do
+            # the outer product of the output gradients for all elements in the
+            # batch, then sum along the batch dimension; giving an [l_out,
+            # l_out] tensor.
             S = (s[..., None] @ s[:, None]).sum(0)
             if module_name not in output_grads.keys():
                 output_grads[module_name] = S
@@ -247,7 +257,6 @@ def save_output_grad_hook(
                 output_grads[module_name] = t.zeros(
                     s.size(-1), n_kfac, device=s.device, dtype=s.dtype
                 )
-            s = s.to(dtype=svd_dtype)
             output_grads[module_name] = incremental_svd(
                 output_grads[module_name], s, svd_dtype, n_kfac
             )
@@ -257,20 +266,25 @@ def save_output_grad_hook(
 
 def register_hooks(
     model: nn.Module,
-    activations: dict[str, t.Tensor],
-    output_grads: dict[str, t.Tensor],
+    activations: dict[str, activation_t],
+    output_grads: dict[str, outgrad_t],
     target_module_keywords: list[str],
-    n_kfac: Optional[int] = 10,
+    n_kfac: int | None = 10,
     lr_threshold: int = 100,
     exclude_bias: bool = False,
-) -> tuple[list, dict]:
+) -> list[RemovableHandle]:
     """Registers the activation and output gradient hooks.
-
 
     Args:
         model: the `nn.Module` on which to attach the hooks
-        activations: dictionary in which to store the parameter activations
-        output_grads: dictionary in which to store the output gradients
+        activations: dictionary in which to store the parameter activations.
+            The side length is l_in, or l_in + 1; that is equal to the number
+            of input features to layer l, or one more if there is a bias. The
+            last dimension is n_kfac if l_in >= lr_threshold.
+        output_grads: dictionary in which to store the output gradients. The
+            side length l_out is equal to the number of output features of
+            layer l (regardless of the presence of a bias; unlike the
+            activations). The last dimension is n_kfac if l_out >= lr_threshold
         target_module_keywords: a list of the network modules to include in the
             GGN. Note, only nn.Linear layers are currently supported.
         n_kfac: the rank we use to approximate large Kronecker factors. If set
@@ -287,10 +301,8 @@ def register_hooks(
 
     Returns:
         - a list of hooks (for later removal),
-        - a map indicating whether a layer has a wide input
     """
     hooks: list[RemovableHandle] = []
-    has_wide_input: dict[str, bool] = dict()
     for name, module in model.named_modules():
         if any([kw in name for kw in target_module_keywords]) and (
             isinstance(module, nn.Linear)
@@ -300,26 +312,20 @@ def register_hooks(
                 raise Exception(f"Module of same name {name} already registered")
             has_bias = hasattr(module, "bias") and module.bias is not None
             if exclude_bias:
+                # NOTE: this is a hack that should be removed
                 has_bias = False
-            if n_kfac is None:
-                has_wide_input[name] = True
-            else:
-                has_wide_input[name] = module.in_features > lr_threshold
             fwd_hook = module.register_forward_pre_hook(
-                save_input_hook(
-                    name, activations, has_bias, n_kfac, use_lr=has_wide_input[name]
-                )
+                save_input_hook(name, activations, n_kfac, lr_threshold, has_bias)
             )
             bwd_hook = module.register_full_backward_hook(
-                save_output_grad_hook(
-                    name, output_grads, n_kfac=n_kfac, use_lr=not has_wide_input[name]
-                )
+                save_output_grad_hook(name, output_grads, n_kfac, lr_threshold)
             )
             hooks.extend((fwd_hook, bwd_hook))
-    return hooks, has_wide_input
+
+    return hooks
 
 
-def remove_hooks(hooks: list) -> None:
+def remove_hooks(hooks: list[RemovableHandle]) -> None:
     """Remove the hooks from the module.
 
     Args:
@@ -331,16 +337,14 @@ def remove_hooks(hooks: list) -> None:
 
 def calculate_kronecker_factors(
     model: nn.Module,
-    forward_call: Callable[[nn.Module, Any], t.Tensor],
+    forward_call: Callable[[nn.Module, Any], Float[Tensor, "batch c"]],
     loader: DataLoader,
-    n_kfac: int,
-    lr_threshold: int,
-    device: str,
-    dtype: Optional[t.dtype] = None,
+    n_kfac: int | None = None,
+    lr_threshold: int = 512,
     target_module_keywords: list[str] = ["lora"],
     exclude_bias: bool = False,
     use_tqdm: bool = False,
-) -> dict[str, tuple[t.Tensor, t.Tensor]]:
+) -> KFAC_t:
     """
     Calculate the Kronecer factors, (A, S) for the likelihood, used to
     approximate the GGN / Fisher.
@@ -353,17 +357,16 @@ def calculate_kronecker_factors(
             distribution
         loader: a data loader for the dataset with which to calculate the
             curvature / Kronecker factors
-        n_kfac: rank to use for the low-rank approximatino of large Kronecker
-            factors
+        n_kfac: an optional (low) rank to use for a low-rank approximation of
+            large Kronecker factors. If this is None, then no low-rank
+            approximations are used.
         lr_threshold: the threshold beyond which a Kronecker factor is
-            considered large
-        device: device to use
-        dtype: datatype to store factors in on disk. If omitted, same dtype as
-            current model parameters is used.
+            considered large and a low-rank approximation is applied.
         target_module_keywords: a list of keywords which identify the network
             modules whose parameters we want to include in the Hessian
             calculation
-        exclude_bias: whether to ignore bias terms
+        exclude_bias: whether to ignore bias terms (NOTE: this is a hack and
+            should not be used)
         use_tqdm: whether to show progress with TQDM
 
     Warning:
@@ -380,8 +383,7 @@ def calculate_kronecker_factors(
     activations: dict[str, t.Tensor] = dict()
     output_grads: dict[str, t.Tensor] = dict()
 
-    # activations, output_grads = dict(), dict()
-    hooks, has_wide_input = register_hooks(
+    hooks = register_hooks(
         model,
         activations,
         output_grads,
@@ -390,10 +392,6 @@ def calculate_kronecker_factors(
         lr_threshold,
         exclude_bias=exclude_bias,
     )
-    if dtype is None or not isinstance(dtype, t.dtype):
-        for p in model.parameters():
-            if p.dtype.is_floating_point:
-                dtype = p.dtype
 
     for batch in tqdm(loader, disable=not use_tqdm, file=sys.stdout):
         model.zero_grad()
@@ -411,105 +409,10 @@ def calculate_kronecker_factors(
 
         t.cuda.empty_cache()
 
-    # Compute the Cholesky factors for the full-rank (smaller) Kronecker
-    # factors
-    for name, A in activations.items():
-        # Activations of LoRA layers with wide inputs are low rank
-        is_low_rank = has_wide_input[name]
-        if is_low_rank:
-            activations[name] = A.to(device, dtype)
-        else:
-            L = stable_cholesky(A.to(dtype=t.float64))
-            activations[name] = L.to(device, dtype)
-
-    for name, S in output_grads.items():
-        # Output gradients of LoRA layers with wide outputs are low rank
-        is_low_rank = not has_wide_input[name]
-        if is_low_rank:
-            output_grads[name] = S.to(device, dtype)
-        else:
-            L = stable_cholesky(S.to(dtype=t.float64))
-            output_grads[name] = L.to(device, dtype)
-
     remove_hooks(hooks)
 
-    factors = {
+    factors: dict[str, tuple[Tensor, Tensor]] = {
         k: (A, S) for (k, A), (_, S) in zip(activations.items(), output_grads.items())
     }
 
     return factors
-
-
-def calculate_full_kronecker_factors(
-    model: nn.Module,
-    forward_call: Callable[[nn.Module, Any], t.Tensor],
-    loader: DataLoader,
-    device: str,
-    dtype: Optional[t.dtype] = None,
-    target_module_keywords: list[str] = ["lora"],
-    exclude_bias: bool = False,
-    use_tqdm: bool = False,
-) -> tuple[dict[str, t.Tensor], dict[str, t.Tensor]]:
-    """Full-rank Kronecker factor calculation
-
-    Args:
-        model: the model with LoRA adapters, for which we are calculating the
-            Kronecker factors
-        forward_call: A function which accepts a batch from the provided data
-            loader, and returns the logits from model's predictive
-            distribution
-        loader: a data loader for the dataset with which to calculate the
-            curvature / Kronecker factors
-        device: device to use
-        dtype: datatype to store factors in on disk. If omitted, same dtype as
-            current model parameters is used.
-        target_module_keywords: a list of keywords which identify the network
-            modules whose parameters we want to include in the Hessian
-            calculation
-        exclude_bias: whether to ignore bias terms
-        use_tqdm: whether to show progress with TQDM
-
-    Returns:
-        A dictionary containing the Kronecker factors; keyed by module name,
-        containing a tuple (A, S) with the activation factor (A) as the first
-        element, and the output gradient factor (S) as the second element.
-    """
-    # TODO: wrap `calculate_kronecker_factors`; passing in appropriate arguments
-
-    model = model.train()
-
-    activations, output_grads = dict(), dict()
-    hooks, _ = register_hooks(
-        model,
-        activations,
-        output_grads,
-        target_module_keywords,
-        n_kfac=None,
-        exclude_bias=exclude_bias,
-    )
-    if dtype is None or not isinstance(dtype, t.dtype):
-        for p in model.parameters():
-            if p.dtype.is_floating_point:
-                dtype = p.dtype
-
-    for batch in tqdm(loader, disable=not use_tqdm, file=sys.stdout):
-        model.zero_grad()
-        logits = forward_call(model, batch)
-        assert logits.dim() == 2
-
-        with t.no_grad():
-            sampled_ys = t.multinomial(logits.softmax(-1), 1).view(-1)
-
-        pullback_loss = F.cross_entropy(logits, sampled_ys)
-
-        with disable_input_hooks():
-            pullback_loss.backward()
-
-        t.cuda.empty_cache()
-
-    activations = {n: A.to(device, dtype) for n, A in activations.items()}
-    output_grads = {n: S.to(device, dtype) for n, S in output_grads.items()}
-
-    remove_hooks(hooks)
-
-    return activations, output_grads

@@ -19,6 +19,7 @@ prior.
 
 .. autofunction:: bayesian_lora.main.model_evidence
 
+
 Posterior Precision
 -------------------
 

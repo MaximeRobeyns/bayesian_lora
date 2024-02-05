@@ -7,7 +7,10 @@ import torch as t
 
 from torch.linalg import LinAlgError
 
-from bayesian_lora.kfac import stable_cholesky, incremental_svd
+from bayesian_lora.kfac import (
+    stable_cholesky,
+    incremental_svd,
+)
 
 
 def test_ill_conditioned_matrix():

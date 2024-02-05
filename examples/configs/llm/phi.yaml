@@ -15,6 +15,7 @@ model_class: AutoModelForCausalLM
 model_kwargs:
   torch_dtype: auto
   trust_remote_code: true
+  attn_implementation: "flash_attention_2"
 
 # Global HF generation configurations
 global_gen_kwargs: {}
