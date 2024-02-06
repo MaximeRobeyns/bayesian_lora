@@ -18,7 +18,7 @@ log_level: INFO # DEBUG | INFO | WARN | ERROR | CRITICAL
 # Whether to (re)-run each of the steps (MAP training, log likelihood
 # calculation, Kronecker factor calculation, marginal likelihood tuning and
 # linearized prediction), or use existing checkpoints if present.
-run_every_step: true
+run_every_step: false
 
 # Print this configuration at the start
 print_config: false

@@ -157,18 +157,13 @@ def main(cfg: DictConfig):
             "return_tensors": "pt",
         }
         inputs = tokenizer(prompts, **tok_kwargs).to(device)
-        with t.backends.cuda.sdp_kernel(
-            enable_flash=has_flash,
-            enable_math=False,
-            enable_mem_efficient=False,
-        ):
-            outputs = model(**inputs)
+        outputs = model(**inputs)
         logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
         logits = logits.reshape(-1, logits.size(-1))
         return logits
 
     kfac_path = f"{cfg.paths.output_dir}/kronecker_factors.pth"
-    if not os.path.exists(kfac_path) or cfg.run_every_step:
+    if not os.path.exists(kfac_path) or cfg.run_every_step or True:
         logging.info("Computing the low-rank Kronecker factors")
         factors = calculate_kronecker_factors(
             model,
@@ -177,7 +172,7 @@ def main(cfg: DictConfig):
             cfg.n_kfac,
             cfg.lr_threshold,
             ["lora"],
-            cfg.use_tqdm,
+            use_tqdm=cfg.use_tqdm,
         )
         # Calculate Cholesky decomposition of the smaller factors
         factors = cholesky_decompose_small_factors(

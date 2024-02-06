@@ -53,6 +53,7 @@ def calc_M(
     Returns:
         The `M` matrix, and optionally the `L` and `B` matrices too.
     """
+    print(f"A: {activations.shape}, S: {output_grads.shape}")
     if activations.shape[-2:] == (n_lora, n_lora):
         L, B = (activations, output_grads)
     else:
@@ -87,6 +88,9 @@ def cholesky_decompose_small_factors(
         Kronecker factors, with small factors Cholesky decomposed.
     """
     for name, (A, S) in factors.items():
+        #
+        # TODO: fix here?
+        #
         if A.size(0) < lr_threshold:
             A = stable_cholesky(A.to(dtype=t.float64))
         if S.size(0) < lr_threshold:
@@ -121,7 +125,7 @@ def model_evidence(
     logdet = t.tensor(0.0)
     d = 1
 
-    for (A, S) in factors.values():
+    for k, (A, S) in factors.items():
         d = max(A.shape + S.shape)
 
         M = calc_M(A, S, n_lora, n_kfac, s2)
