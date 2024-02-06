@@ -188,7 +188,6 @@ def save_input_hook(
             a = t.hstack((a, t.ones_like(a[:, :1])))
         assert a.dim() == 2
         if a.size(-1) < lr_threshold or n_kfac is None:
-            # print(f"activation for {module_name} has of {a.shape} is NOT LR")
             # We're not using a low-rank approximation for this factor; just do
             # the outer product of the activations for all the elements in the
             # batch, then sum along batch dim:
@@ -198,7 +197,6 @@ def save_input_hook(
             else:
                 activations[module_name] += A
         else:
-            # print(f"activation for {module_name} has of {a.shape} is LR")
             if module_name not in activations.keys():
                 # Initialise a correctly sized matrix of 0s
                 activations[module_name] = t.zeros(
@@ -253,7 +251,6 @@ def save_output_grad_hook(
             else:
                 output_grads[module_name] += S
         else:
-            # print(f"outout grads for {module_name} of shape {s.shape} is LR")
             # Never reach this branch if n_kfac is None
             if module_name not in output_grads.keys():
                 # Initialise a correctly sized matrix of 0s
