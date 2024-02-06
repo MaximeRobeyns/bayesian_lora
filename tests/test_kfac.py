@@ -89,19 +89,19 @@ class _TestingModel(nn.Module):
         return self.net(x).softmax(-1)
 
 
+def fwd_call(model: nn.Module, batch: Any) -> Float[Tensor, "batch out_params"]:
+    xs, _ = batch
+    logits = model(xs)
+    logits = logits[:, -1]  # emulate selecting the last token
+    return logits
+
+
 def test_full_rank_kfac():
     N, S, bs = 100, 8, 16
     features = [10, 20, 5]
     tmp_model = _TestingModel(features)
     xs, ys = t.randn(N, S, features[0]), t.randn(N, S, features[-1])
     loader = DataLoader(TensorDataset(xs, ys), batch_size=bs)
-
-    def fwd_call(model: nn.Module, batch: Any) -> Float[Tensor, "batch out_params"]:
-        xs, _ = batch
-        logits = model(xs)
-        # emulate selecting the last token
-        logits = logits[:, -1]
-        return logits
 
     # Sanity check test setup
     for b in loader:
@@ -122,3 +122,68 @@ def test_full_rank_kfac():
         n, m = features[i], features[i + 1]
         assert A.shape == (n, n), f"Unexpected shape for {k}:A"
         assert S.shape == (m, m), f"Unexpected shape for {k}:S"
+
+
+def test_low_rank_kfac():
+    N, S, bs = 100, 8, 16
+    n_kfac, lr_threshold = 4, 128
+    features = [256, 256, 10]
+    tmp_model = _TestingModel(features)
+    xs, ys = t.randn(N, S, features[0]), t.randn(N, S, features[-1])
+    loader = DataLoader(TensorDataset(xs, ys), batch_size=bs)
+
+    factors = calculate_kronecker_factors(
+        tmp_model,
+        fwd_call,
+        loader,
+        n_kfac=n_kfac,
+        lr_threshold=128,
+        target_module_keywords=["FC"],
+    )
+
+    assert factors is not None
+    assert len(factors) == len(features) - 1
+    for i, (k, (A, S)) in enumerate(factors.items()):
+        n, m = features[i], features[i + 1]
+        if n < lr_threshold:
+            assert A.shape == (n, n), f"Unexpected shape for {k}:A"
+        else:
+            assert A.shape == (n, n_kfac), f"Unexpected shape for {k}:A"
+        if m < lr_threshold:
+            assert S.shape == (m, m), f"Unexpected shape for {k}:S"
+        else:
+            assert S.shape == (m, n_kfac), f"Unexpected shape for {k}:S"
+
+
+def test_low_rank_kfac_lora_like():
+    """
+    LoRA-like alternating feature shapes
+    """
+    N, S, bs = 100, 8, 16
+    n_kfac, lr_threshold = 4, 128
+    features = [256, 32, 256, 32, 512]
+    tmp_model = _TestingModel(features)
+    xs, ys = t.randn(N, S, features[0]), t.randn(N, S, features[-1])
+    loader = DataLoader(TensorDataset(xs, ys), batch_size=bs)
+
+    factors = calculate_kronecker_factors(
+        tmp_model,
+        fwd_call,
+        loader,
+        n_kfac=n_kfac,
+        lr_threshold=128,
+        target_module_keywords=["FC"],
+    )
+
+    assert factors is not None
+    assert len(factors) == len(features) - 1
+    for i, (k, (A, S)) in enumerate(factors.items()):
+        n, m = features[i], features[i + 1]
+        if n < lr_threshold:
+            assert A.shape == (n, n), f"Unexpected shape for {k}:A"
+        else:
+            assert A.shape == (n, n_kfac), f"Unexpected shape for {k}:A"
+        if m < lr_threshold:
+            assert S.shape == (m, m), f"Unexpected shape for {k}:S"
+        else:
+            assert S.shape == (m, n_kfac), f"Unexpected shape for {k}:S"
