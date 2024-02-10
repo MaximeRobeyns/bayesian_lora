@@ -28,7 +28,7 @@ use_tqdm: true
 
 # MAP training parameters
 map_lr: 5e-5
-train_steps: 400
+train_steps: 40
 
 # The rank used for the large Kronecker factors
 n_kfac: 10

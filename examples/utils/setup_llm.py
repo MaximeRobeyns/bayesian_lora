@@ -23,6 +23,7 @@ from typing import Optional
 from omegaconf import OmegaConf
 from hydra.utils import instantiate
 from transformers import BitsAndBytesConfig, GenerationConfig
+from transformers.utils import is_flash_attn_2_available
 
 # Avoid importing this globally for systems where peft is not installed
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
@@ -52,6 +53,10 @@ def setup_model_kwargs(
     for k, v in model_kwargs.items():
         if "dtype" in k.lower() and v != "auto":
             model_kwargs[k] = str_to_torch_dtype(v)
+        if "attn_implementation" in k.lower():
+            model_kwargs[k] = (
+                "flash_attention_2" if is_flash_attn_2_available() else "sdpa"
+            )
     if use_quant and quantization is not None:
         model_kwargs["quantization_config"] = instantiate(quantization)
     return model_kwargs
@@ -97,11 +102,16 @@ def setup_llm(
     # Configure PEFT if required
     if use_peft and peft is not None:
         logging.info("Setting up PEFT")
-        # NOTE: this manner of setting up the configuration seems to cause
-        # issues when saving with `save_pretrained`... Investigate.
         peft_cfg = instantiate(peft)
         peft_cfg.target_modules = OmegaConf.to_object(peft_cfg.target_modules)
-        # peft_cfg = OmegaConf.to_container(peft_cfg, resolve=True)
+
+        # model.add_adapter(peft_cfg)
+        # model.enable_adapters()
+        # model.train()
+
+        # NOTE: this manner of setting up the configuration seems to cause
+        # issues when saving with `save_pretrained`... Investigate.
+        # # peft_cfg = OmegaConf.to_container(peft_cfg, resolve=True)
         model = get_peft_model(model, peft_cfg)
 
     # Load the HF tokenizer

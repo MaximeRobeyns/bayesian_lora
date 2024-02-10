@@ -60,7 +60,7 @@ def main(cfg: DictConfig):
     # 2. Load PEFT model and dataset
     #
     model, tokenizer, gen_cfg = setup_llm(**cfg.llm)
-    model = model.to(device)
+    # model = model.to(device)
     dset_class: dsets.ClassificationDataset = getattr(dsets, cfg.dset.name)
     dset = dset_class(tokenizer, add_space=cfg.llm.add_space)
 
@@ -93,13 +93,7 @@ def main(cfg: DictConfig):
                 opt.zero_grad()
                 prompts, _, targets = batch
                 inputs = tokenizer(prompts, **cfg.tokenizer_run_kwargs).to(device)
-
-                with t.backends.cuda.sdp_kernel(
-                    enable_flash=has_flash,
-                    enable_math=False,
-                    enable_mem_efficient=False,
-                ):
-                    logits = model(**inputs).logits
+                logits = model(**inputs).logits
                 loss = F.cross_entropy(logits[:, -1], targets.to(device))
                 assert not t.isnan(loss).any(), "NaN in loss for MAP training."
                 loss.backward()
@@ -134,12 +128,7 @@ def main(cfg: DictConfig):
             for batch in tqdm(val_loader, disable=not cfg.use_tqdm, file=sys.stdout):
                 prompts, classes, _ = batch
                 inputs = tokenizer(prompts, **cfg.tokenizer_run_kwargs).to(device)
-                with t.backends.cuda.sdp_kernel(
-                    enable_flash=has_flash,
-                    enable_math=False,
-                    enable_mem_efficient=False,
-                ):
-                    logits = model(**inputs).logits[:, -1, dset.target_ids].squeeze(-1)
+                logits = model(**inputs).logits[:, -1, dset.target_ids].squeeze(-1)
                 probs = logits.softmax(-1)
                 LL += probs.gather(1, classes[:, None].to(device)).sum()
         t.save(LL, ll_path)
@@ -163,7 +152,7 @@ def main(cfg: DictConfig):
         return logits
 
     kfac_path = f"{cfg.paths.output_dir}/kronecker_factors.pth"
-    if not os.path.exists(kfac_path) or cfg.run_every_step or True:
+    if not os.path.exists(kfac_path) or cfg.run_every_step:
         logging.info("Computing the low-rank Kronecker factors")
         factors = calculate_kronecker_factors(
             model,
@@ -200,6 +189,7 @@ def main(cfg: DictConfig):
             t.nn.utils.clip_grad_norm_(s2, 1.0)
             opt.step()
         t.save({"s2": s2}, prior_path)
+        logging.info(f"prior variance is: {s2.item()}")
     else:
         logging.info("Loading prior parameters (optimised using marginal likelihood)")
         priors = t.load(prior_path)
@@ -217,6 +207,7 @@ def main(cfg: DictConfig):
 
     cfg.llm.use_quant = False  # because our gradient calcs don't support bnb
     cfg.llm.use_peft = False  # due to the quirk in loading PEFT models
+    # cfg.llm.model_kwargs.attn_implementation = "sdpa"
     model, tokenizer, gen_cfg = setup_llm(**cfg.llm)
     model = peft.PeftModel.from_pretrained(model, map_param_path, is_trainable=True)
     model = model.to(device)
@@ -267,6 +258,7 @@ def main(cfg: DictConfig):
             jacobian, f_mu = jacrev(f, argnums=2, has_aux=True)(
                 model, dset.target_ids, lora_params, inputs
             )
+            # print(jacobian.keys())
             pred_mu.append(f_mu.clone().cpu())
 
             f_var = precision(
@@ -310,11 +302,4 @@ def main(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    try:
-        import flash_attn
-
-        has_flash = True
-    except Exception:
-        has_flash = False
-
     main()

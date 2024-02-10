@@ -19,19 +19,25 @@ import logging
 import torch as t
 import torch.nn as nn
 
-from bayesian_lora.kfac import stable_cholesky, KFAC_t
+from torch import Tensor
+from jaxtyping import Float
+
+from .kfac import stable_cholesky, KFAC_t, activation_t, outgrad_t
 
 __all__ = ["model_evidence", "precision", "cholesky_decompose_small_factors"]
 
 
 def calc_M(
-    activations: t.Tensor,
-    output_grads: t.Tensor,
+    activations: activation_t,
+    output_grads: outgrad_t,
     n_lora: int,
     n_kfac: int,
     s2: t.Tensor,
     return_LB: bool = False,
-) -> t.Tensor | tuple[t.Tensor, tuple[t.Tensor, t.Tensor]]:
+) -> t.Tensor | tuple[
+    Float[Tensor, "n_lora_x_n_kfac n_lora_x_n_kfac"],
+    tuple[Float[Tensor, "n_lora n_lora"], Float[Tensor, "d n_kfac"]] | None,
+]:
     """
     Calculates the `M` matrix in Eq. 32 of https://openreview.net/forum?id=FJiUyzOF1m
 
@@ -53,7 +59,6 @@ def calc_M(
     Returns:
         The `M` matrix, and optionally the `L` and `B` matrices too.
     """
-    print(f"A: {activations.shape}, S: {output_grads.shape}")
     if activations.shape[-2:] == (n_lora, n_lora):
         L, B = (activations, output_grads)
     else:
@@ -88,9 +93,6 @@ def cholesky_decompose_small_factors(
         Kronecker factors, with small factors Cholesky decomposed.
     """
     for name, (A, S) in factors.items():
-        #
-        # TODO: fix here?
-        #
         if A.size(0) < lr_threshold:
             A = stable_cholesky(A.to(dtype=t.float64))
         if S.size(0) < lr_threshold:
@@ -105,8 +107,8 @@ def model_evidence(
     factors: KFAC_t,
     n_lora: int,
     n_kfac: int,
-    s2: t.Tensor,
-) -> t.Tensor:
+    s2: Float[Tensor, "1"],
+) -> Float[Tensor, "1"]:
     """
     Use this function to calculate the marginal likelihood / model evidence;
     for instance to tune the value of s2 (prior variance).
@@ -125,7 +127,7 @@ def model_evidence(
     logdet = t.tensor(0.0)
     d = 1
 
-    for k, (A, S) in factors.items():
+    for (A, S) in factors.values():
         d = max(A.shape + S.shape)
 
         M = calc_M(A, S, n_lora, n_kfac, s2)
@@ -138,7 +140,9 @@ def model_evidence(
     map_norms = 0.0
     # TODO: is this a reliable way of identifying the LoRA parameters?
     lora_params = {
-        k: v for k, v in dict(model.named_parameters()).items() if v.requires_grad
+        k: v
+        for k, v in dict(model.named_parameters()).items()
+        if "lora" in k.lower() and v.requires_grad
     }
     for param in lora_params.values():
         map_norms += t.linalg.norm(param)
@@ -182,7 +186,8 @@ def precision(
     # activations and `S` are the output gradients.
     for k, (A, S) in factors.items():
         # Jacobian term
-        g_key = k + ".weight"
+        # TODO: make this less brittle
+        g_key = "base_model.model." + k + ".weight"
         G = jacobian.get(g_key).squeeze()
         # Ensure that G is [batch, n_logits, d, n_lora] sized at all times
         if G.shape[-1] != n_lora:
@@ -210,3 +215,7 @@ def precision(
 
         logging.debug(f"After layer {k}, precision is {precision}")
     return precision
+
+
+def posterior_params() -> None:
+    pass
