@@ -20,7 +20,11 @@ import torch as t
 import torch.nn as nn
 
 from torch import Tensor
+from typing import Callable
 from jaxtyping import Float
+from torch.func import jacrev, functional_call
+from transformers import BatchEncoding
+from transformers.modeling_outputs import ModelOutput
 
 from .kfac import stable_cholesky, KFAC_t, activation_t, outgrad_t
 
@@ -150,6 +154,80 @@ def model_evidence(
     return model_evidence
 
 
+def default_output_callback(outputs: ModelOutput) -> Tensor:
+    """Post process model outputs.
+
+    This function will be passed the results of model(**batch_inputs), and
+    should return the relevant logits. For multiple-choice tasks, this is
+    the class logits, but for full next-token prediction, this would just
+    be all the logits.
+    """
+    # Get the last token for CausalLM
+    logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
+    # Select the logits corresponding to our target classes
+    target_logits = logits[:, dset.target_ids]
+    return target_logits
+
+
+def jacobian_mean(
+    model: nn.Module,
+    batch_inputs: BatchEncoding,
+    target_ids: Tensor | None = None,
+    is_s2s: bool = False,
+    output_callback: Callable[[ModelOutput], Tensor] | None = None,
+) -> tuple[dict[str, Tensor], Tensor]:
+    """Calculates the Jacobian and logit means
+
+    Args:
+        model: the LoRA LLM from which to make predictions
+        batch_inputs: the batch inputs, exactly as you would pass them into
+            your model with ``model(**inputs)``.
+        target_ids: selects specific model outputs. Leave this as None if
+            either a) you wish to consider all model outputs or b) you are
+            providing an output_callback to post-process the model output.
+        is_s2s: whether this is an s2s model. Can omit if providing an
+            output_callback
+        output_callback: a function that takes the results of
+            ``model(**batch_inputs)`` and returns the logits of interest
+    Returns:
+        The Jacobian (a dictionary of module keys and Jacobian Tensors) and the
+        logit mean predictions.
+    """
+
+    if output_callback is None:
+
+        def ocb(outputs: ModelOutput) -> Tensor:
+            logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
+            if target_ids is not None:
+                logits = logits[:, target_ids]
+            return logits
+
+        output_callback = ocb
+
+    def f(
+        model: nn.Module, lora_params: dict[str, Tensor], batch_inputs: BatchEncoding
+    ):
+        outputs = functional_call(model, lora_params, args=(), kwargs=batch_inputs)
+        target_logits = output_callback(outputs)
+        return target_logits, target_logits
+
+    # Get the LoRA parameters
+    # TODO: ensure that these are the same LoRA adapters as applied to the
+    # modules targeted in ``calculate_kronecker_factors``.
+    lora_params = {
+        k: v for k, v in dict(model.named_parameters()).items() if v.requires_grad
+    }
+    # Sanity check
+    for k in lora_params.keys():
+        assert "lora" in k.lower()
+
+    # Calculate the Jacobian of each LoRA layer (and mean predictions)
+    jacobian, f_mu = jacrev(f, argnums=1, has_aux=True)(
+        model, lora_params, batch_inputs
+    )
+    return jacobian, f_mu
+
+
 def precision(
     inputs,
     jacobian,
@@ -199,7 +277,9 @@ def precision(
         term_1 = s2 * G_vec @ G_vec.mT
         assert term_1.shape == (batch_size, n_logits, n_logits)
 
-        M, (L, B) = calc_M(A, S, n_lora, n_kfac, s2, return_LB=True)
+        M, LB = calc_M(A, S, n_lora, n_kfac, s2, return_LB=True)
+        assert LB is not None
+        L, B = LB
         M_size = n_kfac * n_lora
         assert M.shape == (M_size, M_size)
         M = M.to(dtype=t.float64)
@@ -215,7 +295,3 @@ def precision(
 
         logging.debug(f"After layer {k}, precision is {precision}")
     return precision
-
-
-def posterior_params() -> None:
-    pass

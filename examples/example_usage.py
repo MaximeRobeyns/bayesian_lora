@@ -26,10 +26,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from tqdm import tqdm
+from torch import Tensor
 from typing import Any
 from omegaconf import DictConfig
 from torch.func import jacrev, functional_call
 from torchmetrics import Accuracy, CalibrationError
+from transformers.modeling_outputs import ModelOutput
 
 from bayesian_lora import (
     calculate_kronecker_factors,
@@ -41,6 +43,7 @@ from bayesian_lora import (
 from utils import dsets
 from utils.loggers import setup_loggers
 from utils.setup_llm import setup_llm
+from bayesian_lora.main import jacobian_mean
 
 
 @hydra.main(
@@ -228,41 +231,36 @@ def main(cfg: DictConfig):
     acc_metric = Accuracy(**metric_kwargs).to(device)
     ece_metric = CalibrationError(**metric_kwargs).to(device)
 
+    def output_callback(outputs: ModelOutput) -> Tensor:
+        """Post process model outputs.
+
+        This function will be passed the results of model(**batch_inputs), and
+        should return the relevant logits. For multiple-choice tasks, this is
+        the class logits, but for full next-token prediction, this would just
+        be all the logits.
+        """
+        # Get the last token for CausalLM
+        logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
+        # Select the logits corresponding to our target classes
+        target_logits = logits[:, dset.target_ids]
+        return target_logits
+
     with t.no_grad():
         for batch in tqdm(val_loader, disable=not cfg.use_tqdm, file=sys.stdout):
             prompts, classes, _ = batch
             classes = classes.to(device)
 
-            inputs = tokenizer(prompts, **cfg.tokenizer_run_kwargs).to(device)
+            batch_inputs = tokenizer(prompts, **cfg.tokenizer_run_kwargs).to(device)
 
-            # -----------------------------------------------------------------
-            # TODO: pull out into a function accepting fwd_call and returning
-            # (f_mu, f_var)
-            def f(model, target_ids, lora_params, inputs):
-                outputs = functional_call(model, lora_params, args=(), kwargs=inputs)
-                logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
-                target_logits = logits[:, target_ids]
-                return target_logits, target_logits
-
-            # Get the LoRA parameters
-            lora_params = {
-                k: v
-                for k, v in dict(model.named_parameters()).items()
-                if v.requires_grad
-            }
-            # Sanity check
-            for k in lora_params.keys():
-                assert "lora" in k.lower()
-
-            # Calculate the Jacobian of each LoRA layer (and mean predictions)
-            jacobian, f_mu = jacrev(f, argnums=2, has_aux=True)(
-                model, dset.target_ids, lora_params, inputs
+            # Predict the output logit locations
+            jacobian, f_mu = jacobian_mean(
+                model, batch_inputs, output_callback=output_callback
             )
-            # print(jacobian.keys())
             pred_mu.append(f_mu.clone().cpu())
 
+            # Predict the output logit variances
             f_var = precision(
-                inputs,
+                batch_inputs,
                 jacobian,
                 factors,
                 s2,
@@ -272,16 +270,16 @@ def main(cfg: DictConfig):
                 device,
             )
             pred_var.append(f_var.clone().cpu())
-            # ------------------------------------------------------------------
 
+            # Sample logits from a Gaussian parametrised by f_mu, f_var
             L = stable_cholesky(f_var)
             samples = 100_000
             f_mu = f_mu.expand(samples, *f_mu.shape)
             L = L.expand(samples, *L.shape)
             eps = t.randn_like(f_mu)
             logits = (f_mu + L @ eps).squeeze(-1).softmax(-1).mean(0)
-            pred_logits.append(logits.cpu())
 
+            pred_logits.append(logits.cpu())
             total_loss += F.cross_entropy(logits, classes).item()
             acc_metric(logits, classes)
             ece_metric(logits, classes)
