@@ -26,13 +26,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from tqdm import tqdm
+from torch import Tensor
 from typing import Any
 from omegaconf import DictConfig
 from torch.func import jacrev, functional_call
 from torchmetrics import Accuracy, CalibrationError
+from transformers.modeling_outputs import ModelOutput
 
 from bayesian_lora import (
     calculate_kronecker_factors,
+    cholesky_decompose_small_factors,
     model_evidence,
     precision,
     stable_cholesky,
@@ -40,6 +43,7 @@ from bayesian_lora import (
 from utils import dsets
 from utils.loggers import setup_loggers
 from utils.setup_llm import setup_llm
+from bayesian_lora.main import jacobian_mean
 
 
 @hydra.main(
@@ -59,7 +63,7 @@ def main(cfg: DictConfig):
     # 2. Load PEFT model and dataset
     #
     model, tokenizer, gen_cfg = setup_llm(**cfg.llm)
-    model = model.to(device)
+    # model = model.to(device)
     dset_class: dsets.ClassificationDataset = getattr(dsets, cfg.dset.name)
     dset = dset_class(tokenizer, add_space=cfg.llm.add_space)
 
@@ -153,22 +157,24 @@ def main(cfg: DictConfig):
     kfac_path = f"{cfg.paths.output_dir}/kronecker_factors.pth"
     if not os.path.exists(kfac_path) or cfg.run_every_step:
         logging.info("Computing the low-rank Kronecker factors")
-        activations, output_grads = calculate_kronecker_factors(
+        factors = calculate_kronecker_factors(
             model,
             fwd_call,
             train_loader,
             cfg.n_kfac,
             cfg.lr_threshold,
-            device,
-            t.float32,
             ["lora"],
-            cfg.use_tqdm,
+            use_tqdm=cfg.use_tqdm,
         )
-        t.save({"activations": activations, "output_grads": output_grads}, kfac_path)
+        # Calculate Cholesky decomposition of the smaller factors
+        factors = cholesky_decompose_small_factors(
+            factors, cfg.lr_threshold, device, t.float32
+        )
+        t.save({"factors": factors}, kfac_path)
     else:
         logging.info(f"Loading low-rank Kronecker factors from {kfac_path}")
         kfactors = t.load(kfac_path)
-        activations, output_grads = kfactors["activations"], kfactors["output_grads"]
+        factors = kfactors["factors"]
 
     #
     # 6. Use the marginal likelihood to optimise the prior variance
@@ -181,13 +187,12 @@ def main(cfg: DictConfig):
 
         for _ in range(200):
             opt.zero_grad()
-            loss = model_evidence(
-                model, LL, activations, output_grads, cfg.llm.peft.r, cfg.n_kfac, s2
-            )
+            loss = model_evidence(model, LL, factors, cfg.llm.peft.r, cfg.n_kfac, s2)
             loss.backward()
             t.nn.utils.clip_grad_norm_(s2, 1.0)
             opt.step()
         t.save({"s2": s2}, prior_path)
+        logging.info(f"prior variance is: {s2.item()}")
     else:
         logging.info("Loading prior parameters (optimised using marginal likelihood)")
         priors = t.load(prior_path)
@@ -205,6 +210,7 @@ def main(cfg: DictConfig):
 
     cfg.llm.use_quant = False  # because our gradient calcs don't support bnb
     cfg.llm.use_peft = False  # due to the quirk in loading PEFT models
+    # cfg.llm.model_kwargs.attn_implementation = "sdpa"
     model, tokenizer, gen_cfg = setup_llm(**cfg.llm)
     model = peft.PeftModel.from_pretrained(model, map_param_path, is_trainable=True)
     model = model.to(device)
@@ -225,43 +231,38 @@ def main(cfg: DictConfig):
     acc_metric = Accuracy(**metric_kwargs).to(device)
     ece_metric = CalibrationError(**metric_kwargs).to(device)
 
+    def output_callback(outputs: ModelOutput) -> Tensor:
+        """Post process model outputs.
+
+        This function will be passed the results of model(**batch_inputs), and
+        should return the relevant logits. For multiple-choice tasks, this is
+        the class logits, but for full next-token prediction, this would just
+        be all the logits.
+        """
+        # Get the last token for CausalLM
+        logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
+        # Select the logits corresponding to our target classes
+        target_logits = logits[:, dset.target_ids]
+        return target_logits
+
     with t.no_grad():
         for batch in tqdm(val_loader, disable=not cfg.use_tqdm, file=sys.stdout):
             prompts, classes, _ = batch
             classes = classes.to(device)
 
-            inputs = tokenizer(prompts, **cfg.tokenizer_run_kwargs).to(device)
+            batch_inputs = tokenizer(prompts, **cfg.tokenizer_run_kwargs).to(device)
 
-            # -----------------------------------------------------------------
-            # TODO: pull out into a function accepting fwd_call and returning
-            # (f_mu, f_var)
-            def f(model, target_ids, lora_params, inputs):
-                outputs = functional_call(model, lora_params, args=(), kwargs=inputs)
-                logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
-                target_logits = logits[:, target_ids]
-                return target_logits, target_logits
-
-            # Get the LoRA parameters
-            lora_params = {
-                k: v
-                for k, v in dict(model.named_parameters()).items()
-                if v.requires_grad
-            }
-            # Sanity check
-            for k in lora_params.keys():
-                assert "lora" in k.lower()
-
-            # Calculate the Jacobian of each LoRA layer (and mean predictions)
-            jacobian, f_mu = jacrev(f, argnums=2, has_aux=True)(
-                model, dset.target_ids, lora_params, inputs
+            # Predict the output logit locations
+            jacobian, f_mu = jacobian_mean(
+                model, batch_inputs, output_callback=output_callback
             )
             pred_mu.append(f_mu.clone().cpu())
 
+            # Predict the output logit variances
             f_var = precision(
-                inputs,
+                batch_inputs,
                 jacobian,
-                activations,
-                output_grads,
+                factors,
                 s2,
                 dset.n_labels,
                 cfg.llm.peft.r,
@@ -269,16 +270,16 @@ def main(cfg: DictConfig):
                 device,
             )
             pred_var.append(f_var.clone().cpu())
-            # ------------------------------------------------------------------
 
+            # Sample logits from a Gaussian parametrised by f_mu, f_var
             L = stable_cholesky(f_var)
             samples = 100_000
             f_mu = f_mu.expand(samples, *f_mu.shape)
             L = L.expand(samples, *L.shape)
             eps = t.randn_like(f_mu)
             logits = (f_mu + L @ eps).squeeze(-1).softmax(-1).mean(0)
-            pred_logits.append(logits.cpu())
 
+            pred_logits.append(logits.cpu())
             total_loss += F.cross_entropy(logits, classes).item()
             acc_metric(logits, classes)
             ece_metric(logits, classes)

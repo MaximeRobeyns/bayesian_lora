@@ -13,7 +13,7 @@ example:  ## Run through the example script
 	python ./examples/example_usage.py
 
 test:  ## Run the unit tests
-	@python -m pytest -s tests --typeguard-packages=bayesian_lora
+	@python -m pytest -s tests --typeguard-packages=bayesian_lora -k "not test_example"
 
 test_all:  ## Run all the tests (including the slow ones)
 	@python -m pytest -s tests --run-slow

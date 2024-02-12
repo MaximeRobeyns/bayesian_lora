@@ -15,6 +15,7 @@ model_class: AutoModelForCausalLM
 model_kwargs:
   torch_dtype: bfloat16
   low_cpu_mem_usage: true
+  attn_implementation: "flash_attention_2"
 
 # Global HF generation configurations
 global_gen_kwargs: {}
