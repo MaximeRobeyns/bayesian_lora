@@ -31,8 +31,8 @@ separate library, then you can clone the repo and run an editable installation::
 Hackable Installation
 ^^^^^^^^^^^^^^^^^^^^^
 
-The library is currently very small, and has two core dependencies, ``torch``
-and ``tqdm``.
+The library is currently very small, and has three core dependencies, ``torch``
+``tqdm``, and ``jaxtyping``; and two main files.
 
 To this end, feel free to directly copy the file you need into your own project
 and start hacking on it.

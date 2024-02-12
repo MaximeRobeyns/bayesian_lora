@@ -3,9 +3,9 @@
 K-FAC Methods
 =============
 
-The ``bayesian_lora`` package includes a method for calculating an approximate
-Fisher information matrix (or GGN) using Kronecker-factored approximate
-curvature.
+The :mod:`bayesian_lora.kfac` module provides functions for calculating
+an approximate Fisher information matrix (or GGN) using Kronecker-factored
+approximate curvature.
 
 Recall that K-FAC first finds a block-diagonal approximation to the full Fisher
 / GGN. If we had a simple 4-layer network, then this would be:
@@ -15,8 +15,8 @@ Recall that K-FAC first finds a block-diagonal approximation to the full Fisher
            :width: 70%
            :alt: Block-diagonal approximation
 
-Further, each of these blocks (:math:`\mathbf{G}_{\ell \ell}`) are further
-approximated as the product of twi Kronecker factors, one corresponding to the
+Eeach of these blocks (:math:`\mathbf{G}_{\ell \ell}`) are further
+approximated as the product of two Kronecker factors, one corresponding to the
 input *activations*, :math:`\mathbf{A}_{\ell-1}`, and another to the *output
 gradients*, :math:`\mathbf{S}_{\ell}`. That is, for a particular layer /
 ``nn.Module`` indexed by :math:`\ell`, we approximate its block of the full
@@ -29,7 +29,7 @@ Fisher as
 
 These factors (curvature information around the network's current parameters)
 are calculated over some dataset :math:`\mathcal{D}`, and this is what the
-functions below calculate.
+:func:`bayesian_lora.calculate_kronecker_factors` function below calculates.
 
 Rather than using numerical indices :math:`\ell \in \{1, 2, \ldots, L\}`, we use
 the ``nn.Module``'s name to identify the different blocks, and return the
@@ -41,16 +41,11 @@ Full-Rank K-FAC
 The simplest variant is a *full-rank* Kronecker factorisation, meaning that we
 store the :math:`\mathbf{A}` and :math:`\mathbf{S}` matrices exactly.
 
-.. autofunction:: bayesian_lora.kfac.calculate_full_kronecker_factors
+.. autofunction:: bayesian_lora.calculate_kronecker_factors
 
-Low-Rank K-FAC
---------------
-
-Further, these Kronecker factors can themselves be approximated as
-low-rank which is particularly useful for LLMs, where the factors may be
-:math:`4096 \times 4096` for each layer in a transformer.
-
-.. autofunction:: bayesian_lora.kfac.calculate_kronecker_factors
+Notice how these Kronecker factors can themselves be approximated as low-rank
+which is particularly useful for LLMs, where the factors may be :math:`4096
+\times 4096` for each layer in a transformer.
 
 Internal Functions
 ------------------

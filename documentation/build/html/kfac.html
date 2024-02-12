@@ -7,12 +7,12 @@
 <meta property="og:type" content="website" />
 <meta property="og:url" content="kfac.html" />
 <meta property="og:site_name" content="bayesian_lora" />
-<meta property="og:description" content="The bayesian_lora package includes a method for calculating an approximate Fisher information matrix (or GGN) using Kronecker-factored approximate curvature. Recall that K-FAC first finds a block-d..." />
+<meta property="og:description" content="The bayesian_lora.kfac module provides functions for calculating an approximate Fisher information matrix (or GGN) using Kronecker-factored approximate curvature. Recall that K-FAC first finds a bl..." />
 <meta property="og:image:width" content="1146" />
 <meta property="og:image:height" content="600" />
 <meta property="og:image" content="/None" />
-<meta property="og:image:alt" content="The bayesian_lora package includes a method for calculating an approximate Fisher information matrix (or GGN) using Kronecker-factored approximate curvature...." />
-<meta name="description" content="The bayesian_lora package includes a method for calculating an approximate Fisher information matrix (or GGN) using Kronecker-factored approximate curvature. Recall that K-FAC first finds a block-d..." />
+<meta property="og:image:alt" content="The bayesian_lora.kfac module provides functions for calculating an approximate Fisher information matrix (or GGN) using Kronecker-factored approximate curva..." />
+<meta name="description" content="The bayesian_lora.kfac module provides functions for calculating an approximate Fisher information matrix (or GGN) using Kronecker-factored approximate curvature. Recall that K-FAC first finds a bl..." />
 <meta name="twitter:card" content="summary_large_image" />
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Bayesian Lora" href="bayesian_lora.html" /><link rel="prev" title="Bayesian LoRA" href="index.html" />
 
@@ -207,16 +207,16 @@
         <article role="main">
           <section id="k-fac-methods">
 <span id="kfac"></span><h1>K-FAC Methods<a class="headerlink" href="#k-fac-methods" title="Link to this heading">#</a></h1>
-<p>The <code class="docutils literal notranslate"><span class="pre">bayesian_lora</span></code> package includes a method for calculating an approximate
-Fisher information matrix (or GGN) using Kronecker-factored approximate
-curvature.</p>
+<p>The <code class="xref py py-mod docutils literal notranslate"><span class="pre">bayesian_lora.kfac</span></code> module provides functions for calculating
+an approximate Fisher information matrix (or GGN) using Kronecker-factored
+approximate curvature.</p>
 <p>Recall that K-FAC first finds a block-diagonal approximation to the full Fisher
 / GGN. If we had a simple 4-layer network, then this would be:</p>
 <figure class="align-center">
 <a class="reference internal image-reference" href="_images/block_diagonal.svg"><img alt="Block-diagonal approximation" src="_images/block_diagonal.svg" width="70%" /></a>
 </figure>
-<p>Further, each of these blocks (<span class="math notranslate nohighlight">\(\mathbf{G}_{\ell \ell}\)</span>) are further
-approximated as the product of twi Kronecker factors, one corresponding to the
+<p>Eeach of these blocks (<span class="math notranslate nohighlight">\(\mathbf{G}_{\ell \ell}\)</span>) are further
+approximated as the product of two Kronecker factors, one corresponding to the
 input <em>activations</em>, <span class="math notranslate nohighlight">\(\mathbf{A}_{\ell-1}\)</span>, and another to the <em>output
 gradients</em>, <span class="math notranslate nohighlight">\(\mathbf{S}_{\ell}\)</span>. That is, for a particular layer /
 <code class="docutils literal notranslate"><span class="pre">nn.Module</span></code> indexed by <span class="math notranslate nohighlight">\(\ell\)</span>, we approximate its block of the full
@@ -227,7 +227,7 @@ Fisher as</p>
 </div>
 <p>These factors (curvature information around the network’s current parameters)
 are calculated over some dataset <span class="math notranslate nohighlight">\(\mathcal{D}\)</span>, and this is what the
-functions below calculate.</p>
+<a class="reference internal" href="#bayesian_lora.calculate_kronecker_factors" title="bayesian_lora.calculate_kronecker_factors"><code class="xref py py-func docutils literal notranslate"><span class="pre">bayesian_lora.calculate_kronecker_factors()</span></code></a> function below calculates.</p>
 <p>Rather than using numerical indices <span class="math notranslate nohighlight">\(\ell \in \{1, 2, \ldots, L\}\)</span>, we use
 the <code class="docutils literal notranslate"><span class="pre">nn.Module</span></code>’s name to identify the different blocks, and return the
 factors in dictionaries of type <code class="docutils literal notranslate"><span class="pre">dict[str,</span> <span class="pre">t.Tensor]</span></code>.</p>
@@ -236,70 +236,33 @@ factors in dictionaries of type <code class="docutils literal notranslate"><span
 <p>The simplest variant is a <em>full-rank</em> Kronecker factorisation, meaning that we
 store the <span class="math notranslate nohighlight">\(\mathbf{A}\)</span> and <span class="math notranslate nohighlight">\(\mathbf{S}\)</span> matrices exactly.</p>
 <dl class="py function">
-<dt class="sig sig-object py" id="bayesian_lora.kfac.calculate_full_kronecker_factors">
-<span class="sig-prename descclassname"><span class="pre">bayesian_lora.kfac.</span></span><span class="sig-name descname"><span class="pre">calculate_full_kronecker_factors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">forward_call</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Module</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loader</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataLoader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_module_keywords</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">['lora']</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_bias</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_tqdm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#bayesian_lora.kfac.calculate_full_kronecker_factors" title="Link to this definition">#</a></dt>
-<dd><p>Full-rank Kronecker factor calculation</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>model</strong> – the model with LoRA adapters, for which we are calculating the
-Kronecker factors</p></li>
-<li><p><strong>forward_call</strong> – A function which accepts a batch from the provided data
-loader, and returns the logits from model’s predictive
-distribution</p></li>
-<li><p><strong>loader</strong> – a data loader for the dataset with which to calculate the
-curvature / Kronecker factors</p></li>
-<li><p><strong>device</strong> – device to use</p></li>
-<li><p><strong>dtype</strong> – datatype to store factors in on disk. If omitted, same dtype as
-current model parameters is used.</p></li>
-<li><p><strong>target_module_keywords</strong> – a list of keywords which identify the network
-modules whose parameters we want to include in the Hessian
-calculation</p></li>
-<li><p><strong>exclude_bias</strong> – whether to ignore bias terms</p></li>
-<li><p><strong>use_tqdm</strong> – whether to show progress with TQDM</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A dictionary containing the Kronecker factors; keyed by module name,
-containing a tuple (A, S) with the activation factor (A) as the first
-element, and the output gradient factor (S) as the second element.</p>
-</dd>
-</dl>
-</dd></dl>
-
-</section>
-<section id="low-rank-k-fac">
-<h2>Low-Rank K-FAC<a class="headerlink" href="#low-rank-k-fac" title="Link to this heading">#</a></h2>
-<p>Further, these Kronecker factors can themselves be approximated as
-low-rank which is particularly useful for LLMs, where the factors may be
-<span class="math notranslate nohighlight">\(4096 \times 4096\)</span> for each layer in a transformer.</p>
-<dl class="py function">
-<dt class="sig sig-object py" id="bayesian_lora.kfac.calculate_kronecker_factors">
-<span class="sig-prename descclassname"><span class="pre">bayesian_lora.kfac.</span></span><span class="sig-name descname"><span class="pre">calculate_kronecker_factors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">forward_call</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Module</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loader</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataLoader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_kfac</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_module_keywords</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">['lora']</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_bias</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_tqdm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#bayesian_lora.kfac.calculate_kronecker_factors" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="bayesian_lora.calculate_kronecker_factors">
+<span class="sig-prename descclassname"><span class="pre">bayesian_lora.</span></span><span class="sig-name descname"><span class="pre">calculate_kronecker_factors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">forward_call</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Module</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Float</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'batch</span> <span class="pre">n_classes'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loader</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataLoader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_kfac</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">512</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_module_keywords</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">['']</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_bias</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_tqdm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Float</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'l_in</span> <span class="pre">l_in_or_n_kfac'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Float</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'l_out</span> <span class="pre">l_out_or_n_kfac'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#bayesian_lora.calculate_kronecker_factors" title="Link to this definition">#</a></dt>
 <dd><p>Calculate the Kronecer factors, (A, S) for the likelihood, used to
 approximate the GGN / Fisher.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>model</strong> – the model with LoRA adapters, for which we are calculating the
-Kronecker factors</p></li>
+<li><p><strong>model</strong> – the model for which we are calculating the Kronecker factors.
+Note that it needn’t have LoRA adapters.</p></li>
 <li><p><strong>forward_call</strong> – A function which accepts a batch from the provided data
-loader, and returns the logits from model’s predictive
-distribution</p></li>
+loader, and returns the parameters of the model’s predictive
+distribution, as a <code class="docutils literal notranslate"><span class="pre">Tensor</span></code>. Usually this contains the logits
+over each class label.</p></li>
 <li><p><strong>loader</strong> – a data loader for the dataset with which to calculate the
 curvature / Kronecker factors</p></li>
-<li><p><strong>n_kfac</strong> – rank to use for the low-rank approximatino of large Kronecker
-factors</p></li>
-<li><p><strong>lr_threshold</strong> – the threshold beyond which a Kronecker factor is
-considered large</p></li>
-<li><p><strong>device</strong> – device to use</p></li>
-<li><p><strong>dtype</strong> – datatype to store factors in on disk. If omitted, same dtype as
-current model parameters is used.</p></li>
+<li><p><strong>n_kfac</strong> – an optional integer rank to use for a low-rank approximation of
+large Kronecker factors. If this is <code class="docutils literal notranslate"><span class="pre">None</span></code>, then no low-rank
+approximations are used.</p></li>
+<li><p><strong>lr_threshold</strong> – the threshold beyond which the side length of a Kronecker
+factor is considered large and a low-rank approximation is applied.</p></li>
 <li><p><strong>target_module_keywords</strong> – a list of keywords which identify the network
 modules whose parameters we want to include in the Hessian
-calculation</p></li>
-<li><p><strong>exclude_bias</strong> – whether to ignore bias terms</p></li>
-<li><p><strong>use_tqdm</strong> – whether to show progress with TQDM</p></li>
+calculation. This is particularly useful when working with LoRA
+adapters. By deafult, this is <code class="docutils literal notranslate"><span class="pre">[&quot;&quot;]</span></code>; targetting every module.</p></li>
+<li><p><strong>exclude_bias</strong> – whether to ignore bias terms (NOTE: this is a hack and
+should not be used)</p></li>
+<li><p><strong>use_tqdm</strong> – whether to show progress with <code class="docutils literal notranslate"><span class="pre">tqdm</span></code>.</p></li>
 </ul>
 </dd>
 </dl>
@@ -307,6 +270,20 @@ calculation</p></li>
 <p class="admonition-title">Warning</p>
 <p>This function has only been implemented for nn.Linear. Models
 implemented using Conv1D (e.g. GPT2) will sadly not work for now.</p>
+</div>
+<p class="rubric">Examples</p>
+<p>Full-rank Kronecker factor calculation.</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">factors</span> <span class="o">=</span> <span class="n">calculate_kronecker_factors</span><span class="p">(</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">model</span><span class="p">,</span> <span class="n">fwd_call</span><span class="p">,</span> <span class="n">loader</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Low-rank Kronecker factors on LoRA adaptors with inputs</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">factors</span> <span class="o">=</span> <span class="n">calculate_kronecker_factors</span><span class="p">(</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">model</span><span class="p">,</span> <span class="n">fwd_call</span><span class="p">,</span> <span class="n">loader</span><span class="p">,</span> <span class="n">n_kfac</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">lr_threshold</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">target_module_keywords</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;lora&quot;</span><span class="p">],</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">)</span>
+</pre></div>
 </div>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -317,6 +294,9 @@ element, and the output gradient factor (S) as the second element.</p>
 </dl>
 </dd></dl>
 
+<p>Notice how these Kronecker factors can themselves be approximated as low-rank
+which is particularly useful for LLMs, where the factors may be <span class="math notranslate nohighlight">\(4096
+\times 4096\)</span> for each layer in a transformer.</p>
 </section>
 <section id="internal-functions">
 <h2>Internal Functions<a class="headerlink" href="#internal-functions" title="Link to this heading">#</a></h2>
@@ -325,14 +305,22 @@ It calls a number of internal functions, which we document here for re-use and
 completeness.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="bayesian_lora.kfac.register_hooks">
-<span class="sig-prename descclassname"><span class="pre">bayesian_lora.kfac.</span></span><span class="sig-name descname"><span class="pre">register_hooks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_grads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_module_keywords</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_kfac</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_bias</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#bayesian_lora.kfac.register_hooks" title="Link to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">bayesian_lora.kfac.</span></span><span class="sig-name descname"><span class="pre">register_hooks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Float</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'l_in</span> <span class="pre">l_in_or_n_kfac'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_grads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Float</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'l_out</span> <span class="pre">l_out_or_n_kfac'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_module_keywords</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_kfac</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_bias</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">RemovableHandle</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#bayesian_lora.kfac.register_hooks" title="Link to this definition">#</a></dt>
 <dd><p>Registers the activation and output gradient hooks.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>model</strong> – the <cite>nn.Module</cite> on which to attach the hooks</p></li>
-<li><p><strong>activations</strong> – dictionary in which to store the parameter activations</p></li>
-<li><p><strong>output_grads</strong> – dictionary in which to store the output gradients</p></li>
+<li><p><strong>model</strong> – the <code class="docutils literal notranslate"><span class="pre">nn.Module</span></code> on which to attach the hooks (usually the full
+model)</p></li>
+<li><p><strong>activations</strong> – dictionary in which to store the parameter activations.
+The side length is <code class="docutils literal notranslate"><span class="pre">l_in</span></code> (i.e. equal to the number of input
+features in layer <code class="docutils literal notranslate"><span class="pre">l</span></code>), or <code class="docutils literal notranslate"><span class="pre">l_in</span> <span class="pre">+</span> <span class="pre">1</span></code> if there is a bias. The
+last dimension is <code class="docutils literal notranslate"><span class="pre">n_kfac</span></code> if <code class="docutils literal notranslate"><span class="pre">l_in</span> <span class="pre">&gt;=</span> <span class="pre">lr_threshold</span></code>.</p></li>
+<li><p><strong>output_grads</strong> – dictionary in which to store the output gradients. The
+side length <code class="docutils literal notranslate"><span class="pre">l_out</span></code> is equal to the number of output features of
+layer <code class="docutils literal notranslate"><span class="pre">l</span></code> (regardless of the presence of a bias; unlike the
+activations). The last dimension is <code class="docutils literal notranslate"><span class="pre">n_kfac</span></code> if <code class="docutils literal notranslate"><span class="pre">l_out</span> <span class="pre">&gt;=</span>
+<span class="pre">lr_threshold</span></code></p></li>
 <li><p><strong>target_module_keywords</strong> – a list of the network modules to include in the
 GGN. Note, only nn.Linear layers are currently supported.</p></li>
 <li><p><strong>n_kfac</strong> – the rank we use to approximate large Kronecker factors. If set
@@ -351,7 +339,6 @@ S.</p></li>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p><ul class="simple">
 <li><p>a list of hooks (for later removal),</p></li>
-<li><p>a map indicating whether a layer has a wide input</p></li>
 </ul>
 </p>
 </dd>
@@ -360,7 +347,7 @@ S.</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="bayesian_lora.kfac.remove_hooks">
-<span class="sig-prename descclassname"><span class="pre">bayesian_lora.kfac.</span></span><span class="sig-name descname"><span class="pre">remove_hooks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hooks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#bayesian_lora.kfac.remove_hooks" title="Link to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">bayesian_lora.kfac.</span></span><span class="sig-name descname"><span class="pre">remove_hooks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hooks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">RemovableHandle</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#bayesian_lora.kfac.remove_hooks" title="Link to this definition">#</a></dt>
 <dd><p>Remove the hooks from the module.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -371,7 +358,7 @@ S.</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="bayesian_lora.kfac.save_input_hook">
-<span class="sig-prename descclassname"><span class="pre">bayesian_lora.kfac.</span></span><span class="sig-name descname"><span class="pre">save_input_hook</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">has_bias</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_kfac</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_lr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">svd_dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">torch.float64</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#bayesian_lora.kfac.save_input_hook" title="Link to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">bayesian_lora.kfac.</span></span><span class="sig-name descname"><span class="pre">save_input_hook</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Float</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'l_in</span> <span class="pre">l_in_or_n_kfac'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_kfac</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">has_bias</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">svd_dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">torch.float64</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#bayesian_lora.kfac.save_input_hook" title="Link to this definition">#</a></dt>
 <dd><p>A closure which returns a new hook to capture a layer’s input
 activations.</p>
 <dl class="field-list simple">
@@ -382,10 +369,11 @@ modules themselves can be hashed, this makes the Kronecker factors
 more portable.</p></li>
 <li><p><strong>activations</strong> – mapping from layer / module name to input activation
 Kronecker factor</p></li>
-<li><p><strong>has_bias</strong> – does this layer have a bias?</p></li>
 <li><p><strong>n_kfac</strong> – the rank we use if we’re using a low rank appproximation to
 this Kronecker factor</p></li>
-<li><p><strong>use_lr</strong> – are we using a low-rank approximation to this Kronecker factor?</p></li>
+<li><p><strong>lr_threshold</strong> – if the side length <cite>l_in+1</cite> exceeds this threshold, and
+n_kfac is not none, treat the factor as low-rank</p></li>
+<li><p><strong>has_bias</strong> – does this layer have a bias?</p></li>
 <li><p><strong>svd_dtype</strong> – dtype to cast tensors to for SVD calculations</p></li>
 </ul>
 </dd>
@@ -394,7 +382,7 @@ this Kronecker factor</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="bayesian_lora.kfac.save_output_grad_hook">
-<span class="sig-prename descclassname"><span class="pre">bayesian_lora.kfac.</span></span><span class="sig-name descname"><span class="pre">save_output_grad_hook</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_grads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">torch.float32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_kfac</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_lr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">svd_dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">torch.float64</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#bayesian_lora.kfac.save_output_grad_hook" title="Link to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">bayesian_lora.kfac.</span></span><span class="sig-name descname"><span class="pre">save_output_grad_hook</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_grads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Float</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'l_out</span> <span class="pre">l_out_or_n_kfac'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_kfac</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">svd_dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">torch.float64</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#bayesian_lora.kfac.save_output_grad_hook" title="Link to this definition">#</a></dt>
 <dd><p>A closure which returns a new hook to capture a layer’s output
 gradients.</p>
 <dl class="field-list simple">
@@ -407,7 +395,8 @@ factors more portable.</p></li>
 Kronecker factor.</p></li>
 <li><p><strong>n_kfac</strong> – the rank we use if we’re using a low rank appproximation to
 this Kronecker factor</p></li>
-<li><p><strong>use_lr</strong> – are we using a low-rank approximation to this Kronecker factor?</p></li>
+<li><p><strong>lr_threshold</strong> – if the side length <cite>l_in+1</cite> exceeds this threshold, and
+n_kfac is not none, treat the factor as low-rank</p></li>
 <li><p><strong>svd_dtype</strong> – dtype to cast tensors to for SVD calculations</p></li>
 </ul>
 </dd>
@@ -474,11 +463,7 @@ this Kronecker factor</p></li>
             <ul>
 <li><a class="reference internal" href="#">K-FAC Methods</a><ul>
 <li><a class="reference internal" href="#full-rank-k-fac">Full-Rank K-FAC</a><ul>
-<li><a class="reference internal" href="#bayesian_lora.kfac.calculate_full_kronecker_factors"><code class="docutils literal notranslate"><span class="pre">calculate_full_kronecker_factors()</span></code></a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#low-rank-k-fac">Low-Rank K-FAC</a><ul>
-<li><a class="reference internal" href="#bayesian_lora.kfac.calculate_kronecker_factors"><code class="docutils literal notranslate"><span class="pre">calculate_kronecker_factors()</span></code></a></li>
+<li><a class="reference internal" href="#bayesian_lora.calculate_kronecker_factors"><code class="docutils literal notranslate"><span class="pre">calculate_kronecker_factors()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#internal-functions">Internal Functions</a><ul>
