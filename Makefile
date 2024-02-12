@@ -37,5 +37,8 @@ kernel:  ## To setup a Jupyter kernel to run notebooks in the project's virtual 
 docs:  ## Compile the documentation and start watcher
 	@./documentation/writedocs.sh
 
+copydocs:
+	cp -r ./documentation/build/html docs
+
 help:
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
