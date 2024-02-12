@@ -1,4 +1,5 @@
-.PHONY: install install_all example test test_all mypy lab kernel docs help
+.PHONY: install install_all example test test_all mypy lab kernel docs help build
+.PHONY: publish release
 
 install:  ## Install this package in the current environment
 	pip install -e .
@@ -30,6 +31,20 @@ lab:  ## To start a Jupyter Lab server
 kernel:  ## To setup a Jupyter kernel to run notebooks in the project's virtual env
 	python -m ipykernel install --user --name bayesian_lora \
 		--display-name "bayesian_lora"
+
+build:  ## Creates a source distribution and wheel for deployment
+	python3 -m pip install --upgrade build
+	python3 -m build
+
+publish: build  ## Upload the build to PyPI
+	python3 -m twine upload dist/*
+
+release:  ## Create release for GitHub
+	$(eval VERSION := $(shell python -c "import bayesian_lora; print(bayesian_lora.__version__)"))
+	git checkout master
+	git pull origin master
+	git tag -a $(VERSION) -m "Release version $(VERSION)"
+	git push origin $(VERSION)
 
 # Documentation ================================================================
 # Run: pip install -e ".[docs]"
