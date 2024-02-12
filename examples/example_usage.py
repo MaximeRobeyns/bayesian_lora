@@ -187,7 +187,9 @@ def main(cfg: DictConfig):
 
         for _ in range(200):
             opt.zero_grad()
-            loss = model_evidence(model, LL, factors, cfg.llm.peft.r, cfg.n_kfac, s2)
+            loss = model_evidence(
+                model, LL, factors, cfg.llm.peft.r, cfg.n_kfac, s2
+            ).log()
             loss.backward()
             t.nn.utils.clip_grad_norm_(s2, 1.0)
             opt.step()
@@ -259,7 +261,7 @@ def main(cfg: DictConfig):
             pred_mu.append(f_mu.clone().cpu())
 
             # Predict the output logit variances
-            f_var = precision(
+            f_prec = precision(
                 batch_inputs,
                 jacobian,
                 factors,
@@ -269,7 +271,8 @@ def main(cfg: DictConfig):
                 cfg.n_kfac,
                 device,
             )
-            pred_var.append(f_var.clone().cpu())
+            f_var = t.linalg.inv(f_prec)
+            pred_var.append(f_prec.clone().cpu())
 
             # Sample logits from a Gaussian parametrised by f_mu, f_var
             L = stable_cholesky(f_var)

@@ -122,7 +122,7 @@ def model_evidence(
         LL: the log likelihood on a dataset of interest
         factors: dictionary of Kronecker factors
         n_lora: LoRA rank
-        n_kfac: rank to use in low-rank approximation of large Kronecker factors
+        n_kfac: K-FAC rank
         s2: prior variance
 
     Returns:
