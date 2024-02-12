@@ -210,7 +210,7 @@
 <p>This file contains the main methods relating to the <a class="reference external" href="https://openreview.net/forum?id=FJiUyzOF1m">Bayesian Low-Rank
 Adaptation for Large Language Models</a> paper. Namely, calculating the
 model evidence for tuning prior and network hyperparameters and calculating the
-posterior precision for making (linearised) predictions.</p>
+posterior predictive parameters for making (linearised) predictions.</p>
 <section id="model-evidence">
 <h2>Model Evidence<a class="headerlink" href="#model-evidence" title="Link to this heading">#</a></h2>
 <p>The model evidence, or marginal likelihood, is a scalar value that indicates the
@@ -229,7 +229,7 @@ for instance to tune the value of s2 (prior variance).</p>
 <li><p><strong>LL</strong> – the log likelihood on a dataset of interest</p></li>
 <li><p><strong>factors</strong> – dictionary of Kronecker factors</p></li>
 <li><p><strong>n_lora</strong> – LoRA rank</p></li>
-<li><p><strong>n_kfac</strong> – rank to use in low-rank approximation of large Kronecker factors</p></li>
+<li><p><strong>n_kfac</strong> – K-FAC rank</p></li>
 <li><p><strong>s2</strong> – prior variance</p></li>
 </ul>
 </dd>
@@ -240,8 +240,66 @@ for instance to tune the value of s2 (prior variance).</p>
 </dd></dl>
 
 </section>
-<section id="posterior-precision">
-<h2>Posterior Precision<a class="headerlink" href="#posterior-precision" title="Link to this heading">#</a></h2>
+<section id="posterior-predictive">
+<h2>Posterior Predictive<a class="headerlink" href="#posterior-predictive" title="Link to this heading">#</a></h2>
+<p>This involves two steps, calculating the mean and the variance.</p>
+<p>For the first, we invoke the (admittedly, awkwardly named) <code class="docutils literal notranslate"><span class="pre">jacobian_mean</span></code>
+function, which returns the Jacobian, and the mean, respectively.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="bayesian_lora.main.jacobian_mean">
+<span class="sig-prename descclassname"><span class="pre">bayesian_lora.main.</span></span><span class="sig-name descname"><span class="pre">jacobian_mean</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BatchEncoding</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_ids</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_s2s</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">ModelOutput</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#bayesian_lora.main.jacobian_mean" title="Link to this definition">#</a></dt>
+<dd><p>Calculates the Jacobian and logit means</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> – the LoRA LLM from which to make predictions</p></li>
+<li><p><strong>batch_inputs</strong> – the batch inputs, exactly as you would pass them into
+your model with <code class="docutils literal notranslate"><span class="pre">model(**inputs)</span></code>.</p></li>
+<li><p><strong>target_ids</strong> – selects specific model outputs. Leave this as None if
+either a) you wish to consider all model outputs or b) you are
+providing an output_callback to post-process the model output.</p></li>
+<li><p><strong>is_s2s</strong> – whether this is an s2s model. Can omit if providing an
+output_callback</p></li>
+<li><p><strong>output_callback</strong> – a function that takes the results of
+<code class="docutils literal notranslate"><span class="pre">model(**batch_inputs)</span></code> and returns the logits of interest</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The Jacobian (a dictionary of module keys and Jacobian Tensors) and the
+logit mean predictions.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<p>As you can see, there are two ways of calling this function, which determine how
+we’ll handle the outputs from the wrapped network call.</p>
+<ol class="arabic">
+<li><p><strong>Directly, with parameters</strong> Here, we assume that a model is either a
+sequence-to-sequence model or not (defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>), and that we may
+optionally want to pick out some specific logits from the model’s full
+vocabulary:</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="n">jacobian</span><span class="p">,</span> <span class="n">f_mu</span> <span class="o">=</span> <span class="n">jacobian_mean</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">batch_inputs</span><span class="p">,</span> <span class="n">target_ids</span><span class="o">=</span><span class="n">dset</span><span class="o">.</span><span class="n">target_ids</span><span class="p">,</span> <span class="n">is_s2s</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Custom output callback</strong> Here, we allow the user to provide a callback
+function, taking in the result of the model’s <code class="docutils literal notranslate"><span class="pre">forward</span></code> call, and returning
+the logits of interest, with arbitrary post-processing in between.</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">default_output_callback</span><span class="p">(</span><span class="n">outputs</span><span class="p">:</span> <span class="n">ModelOutput</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+   <span class="n">logits</span> <span class="o">=</span> <span class="n">outputs</span><span class="o">.</span><span class="n">logits</span> <span class="k">if</span> <span class="n">cfg</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">is_s2s</span> <span class="k">else</span> <span class="n">outputs</span><span class="o">.</span><span class="n">logits</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+   <span class="n">target_logits</span> <span class="o">=</span> <span class="n">logits</span><span class="p">[:,</span> <span class="n">dset</span><span class="o">.</span><span class="n">target_ids</span><span class="p">]</span>
+   <span class="k">return</span> <span class="n">target_logits</span>
+
+<span class="n">jacobian</span><span class="p">,</span> <span class="n">f_mu</span> <span class="o">=</span> <span class="n">jacobian_mean</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">batch_inputs</span><span class="p">,</span> <span class="n">output_callback</span><span class="o">=</span><span class="n">output_callback</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>For the second step, we calculate the output logits’ precision matrix.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="bayesian_lora.main.precision">
 <span class="sig-prename descclassname"><span class="pre">bayesian_lora.main.</span></span><span class="sig-name descname"><span class="pre">precision</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jacobian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">factors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Float</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'l_in</span> <span class="pre">l_in_or_n_kfac'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Float</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'l_out</span> <span class="pre">l_out_or_n_kfac'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_logits</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_lora</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_kfac</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#bayesian_lora.main.precision" title="Link to this definition">#</a></dt>
@@ -328,7 +386,8 @@ factors</p></li>
 <li><a class="reference internal" href="#bayesian_lora.main.model_evidence"><code class="docutils literal notranslate"><span class="pre">model_evidence()</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#posterior-precision">Posterior Precision</a><ul>
+<li><a class="reference internal" href="#posterior-predictive">Posterior Predictive</a><ul>
+<li><a class="reference internal" href="#bayesian_lora.main.jacobian_mean"><code class="docutils literal notranslate"><span class="pre">jacobian_mean()</span></code></a></li>
 <li><a class="reference internal" href="#bayesian_lora.main.precision"><code class="docutils literal notranslate"><span class="pre">precision()</span></code></a></li>
 </ul>
 </li>
@@ -343,7 +402,7 @@ factors</p></li>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=d45e8c67"></script>
+</div><script src="_static/documentation_options.js?v=e3a6060d"></script>
     <script src="_static/doctools.js?v=888ff710"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=32e29ea5"></script>
