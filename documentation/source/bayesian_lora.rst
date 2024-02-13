@@ -60,6 +60,6 @@ we'll handle the outputs from the wrapped network call.
            model, batch_inputs, output_callback=output_callback
        )
 
-For the second step, we calculate the output logits' precision matrix.
+For the second step, we calculate the output logits' covariance matrix.
 
-.. autofunction:: bayesian_lora.main.precision
+.. autofunction:: bayesian_lora.main.variance

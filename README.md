@@ -94,7 +94,7 @@ your parameters (e.g. `prior_var` have gradients).
 ## Posterior Predictive Distribution
 
 To get the parameters of the Gaussian over the logits, use
-the `jacobian_mean` and `precision` functions.
+the `jacobian_mean` and `variance` functions.
 
 ```python
 with t.no_grad():
@@ -111,7 +111,7 @@ with t.no_grad():
         )
 
         # Predict the output logit variances
-        f_prec = precision(
+        f_var = variance(
             batch_inputs,     # inputs
             jacobian,         # the Jacobian dictionary, obtained above
             factors,          # Kronecker factors, as calculated above
@@ -124,7 +124,6 @@ with t.no_grad():
 
         # Now use the parameters to e.g. sample logits from the Gaussian
         # predictive, parametrised by f_mu, f_var
-        f_var = t.linalg.inv(f_prec)
         L = t.linalg.cholesky(f_var)
         samples = 100_000
         f_mu = f_mu.expand(samples, *f_mu.shape)

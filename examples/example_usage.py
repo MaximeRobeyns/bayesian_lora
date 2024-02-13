@@ -37,7 +37,7 @@ from bayesian_lora import (
     calculate_kronecker_factors,
     cholesky_decompose_small_factors,
     model_evidence,
-    precision,
+    variance,
     stable_cholesky,
 )
 from utils import dsets
@@ -261,7 +261,7 @@ def main(cfg: DictConfig):
             pred_mu.append(f_mu.clone().cpu())
 
             # Predict the output logit variances
-            f_prec = precision(
+            f_var = variance(
                 batch_inputs,
                 jacobian,
                 factors,
@@ -271,8 +271,7 @@ def main(cfg: DictConfig):
                 cfg.n_kfac,
                 device,
             )
-            f_var = t.linalg.inv(f_prec)
-            pred_var.append(f_prec.clone().cpu())
+            pred_var.append(f_var.clone().cpu())
 
             # Sample logits from a Gaussian parametrised by f_mu, f_var
             L = stable_cholesky(f_var)
