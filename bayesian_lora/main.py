@@ -28,7 +28,7 @@ from transformers.modeling_outputs import ModelOutput
 
 from .kfac import stable_cholesky, KFAC_t, activation_t, outgrad_t
 
-__all__ = ["model_evidence", "precision", "cholesky_decompose_small_factors"]
+__all__ = ["model_evidence", "variance", "cholesky_decompose_small_factors"]
 
 
 def calc_M(
@@ -228,7 +228,7 @@ def jacobian_mean(
     return jacobian, f_mu
 
 
-def precision(
+def variance(
     inputs,
     jacobian,
     factors: KFAC_t,
@@ -239,7 +239,7 @@ def precision(
     device: str,
 ):
     """
-    Calculates the precision matrix for performing (linearised) prediction.
+    Calculates the variance matrix for performing (linearised) prediction.
 
     Args:
         inputs (dict): tokenized batch of inputs (returned from a HF Tokenizer)
@@ -252,13 +252,13 @@ def precision(
         n_lora: rank used in the LoRA adapters
         n_kfac: rank used for the low-rank approximation of large Kronekcer
             factors
-        device: device on which to accumulate the precision matrix
+        device: device on which to accumulate the variance matrix
     """
 
     batch_size = inputs.input_ids.size(0)
 
     # initialise a matrix to accumulate the result
-    precision = t.zeros((batch_size, n_logits, n_logits), device=device)
+    var_matrix = t.zeros((batch_size, n_logits, n_logits), device=device)
 
     # Iterate over the layers; `k` is the layer name / key, `A` is the input
     # activations and `S` are the output gradients.
@@ -291,7 +291,7 @@ def precision(
         term_2 = s2.pow(2.0) * BGL_vec @ t.linalg.inv(M) @ BGL_vec.mT
         assert term_2.shape == (batch_size, n_logits, n_logits)
 
-        precision += term_1 - term_2.to(precision.dtype)
+        var_matrix += term_1 - term_2.to(var_matrix.dtype)
 
-        logging.debug(f"After layer {k}, precision is {precision}")
-    return precision
+        logging.debug(f"After layer {k}, variance is {var_matrix}")
+    return var_matrix
