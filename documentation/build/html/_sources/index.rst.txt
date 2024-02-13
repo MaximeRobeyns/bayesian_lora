@@ -14,7 +14,7 @@ Installation Guide
 
 The simplest way to use the library is to simply pip install it::
 
-    pip install bayesian_lora
+    pip install bayesian-lora
 
 Editable Installation
 ^^^^^^^^^^^^^^^^^^^^^
