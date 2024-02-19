@@ -422,8 +422,7 @@ def calculate_kronecker_factors(
             sampled_ys = t.multinomial(logits.softmax(-1), 1).view(-1)
 
         # TODO: support other model distributions
-        # TODO: think about the type of reduction to use here
-        pullback_loss = F.cross_entropy(logits, sampled_ys)
+        pullback_loss = F.cross_entropy(logits, sampled_ys, reduction="sum")
 
         with disable_input_hooks():
             pullback_loss.backward()
@@ -434,6 +433,6 @@ def calculate_kronecker_factors(
     factors: KFAC_t = dict()
     for k, A in activations.items():
         S = output_grads[k]
-        factors[k] = (A, S)
+        factors[k] = (A / len(loader), S / len(loader))
 
     return factors

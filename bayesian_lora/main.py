@@ -254,6 +254,7 @@ def variance(
             factors
         device: device on which to accumulate the variance matrix
     """
+    jac_keys = jacobian.keys()
 
     batch_size = inputs.input_ids.size(0)
 
@@ -264,8 +265,19 @@ def variance(
     # activations and `S` are the output gradients.
     for k, (A, S) in factors.items():
         # Jacobian term
-        # TODO: make this less brittle
-        g_key = "base_model.model." + k + ".weight"
+        # TODO: make this less brittle ----------------------------------------
+        # g_key = "base_model.model." + k + ".weight"
+        # g_key = k + ".weight"
+        g_key = None
+        for jac_key in jac_keys:
+            if k in jac_key:
+                g_key = jac_key
+                break
+        assert (
+            g_key is not None
+        ), f"Could not find weight corresponding to kronecker factor {k}"
+        # ---------------------------------------------------------------------
+
         G = jacobian.get(g_key).squeeze()
         # Ensure that G is [batch, n_logits, d, n_lora] sized at all times
         if G.shape[-1] != n_lora:
