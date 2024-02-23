@@ -94,10 +94,11 @@ def main(cfg: DictConfig):
             logging.info(f"Beginning epoch {epoch} ({grad_steps} / {cfg.train_steps})")
             for batch in tqdm(train_loader, disable=not cfg.use_tqdm, file=sys.stdout):
                 opt.zero_grad()
-                prompts, _, targets = batch
+                prompts, classes, _ = batch
                 inputs = tokenizer(prompts, **cfg.tokenizer_run_kwargs).to(device)
-                logits = model(**inputs).logits
-                loss = F.cross_entropy(logits[:, -1], targets.to(device))
+                logits = model(**inputs).logits[:, -1, dset.target_ids.squeeze(-1)]
+                # loss = F.cross_entropy(logits[:, -1], targets.to(device))
+                loss = F.cross_entropy(logits, classes.to(device))
                 assert not t.isnan(loss).any(), "NaN in loss for MAP training."
                 loss.backward()
                 opt.step()
@@ -131,7 +132,7 @@ def main(cfg: DictConfig):
             for batch in tqdm(val_loader, disable=not cfg.use_tqdm, file=sys.stdout):
                 prompts, classes, _ = batch
                 inputs = tokenizer(prompts, **cfg.tokenizer_run_kwargs).to(device)
-                logits = model(**inputs).logits[:, -1, dset.target_ids].squeeze(-1)
+                logits = model(**inputs).logits[:, -1, dset.target_ids.squeeze(-1)]
                 probs = logits.softmax(-1)
                 LL += probs.gather(1, classes[:, None].to(device)).sum()
         t.save(LL, ll_path)
@@ -150,8 +151,12 @@ def main(cfg: DictConfig):
         }
         inputs = tokenizer(prompts, **tok_kwargs).to(device)
         outputs = model(**inputs)
-        logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
-        logits = logits.reshape(-1, logits.size(-1))
+        logits = (
+            outputs.logits[:, dset.target_ids.squeeze(-1)]
+            if cfg.llm.is_s2s
+            else outputs.logits[:, -1, dset.target_ids.squeeze(-1)]
+        )
+        logits = logits.softmax(-1)
         return logits
 
     kfac_path = f"{cfg.paths.output_dir}/kronecker_factors.pth"
@@ -244,7 +249,7 @@ def main(cfg: DictConfig):
         # Get the last token for CausalLM
         logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
         # Select the logits corresponding to our target classes
-        target_logits = logits[:, dset.target_ids]
+        target_logits = logits[:, dset.target_ids.squeeze(-1)]
         return target_logits
 
     with t.no_grad():
@@ -271,6 +276,8 @@ def main(cfg: DictConfig):
                 cfg.n_kfac,
                 device,
             )
+            print(f"f_var shape: {f_var.shape}")
+
             pred_var.append(f_var.clone().cpu())
 
             # Sample logits from a Gaussian parametrised by f_mu, f_var
@@ -278,8 +285,9 @@ def main(cfg: DictConfig):
             samples = 100_000
             f_mu = f_mu.expand(samples, *f_mu.shape)
             L = L.expand(samples, *L.shape)
-            eps = t.randn_like(f_mu)
-            logits = (f_mu + L @ eps).squeeze(-1).softmax(-1).mean(0)
+            eps = t.randn_like(f_mu).unsqueeze(-1)
+            logits = f_mu[..., None] + L @ eps
+            logits = logits.squeeze(-1).softmax(-1).mean(0)
 
             pred_logits.append(logits.cpu())
             total_loss += F.cross_entropy(logits, classes).item()

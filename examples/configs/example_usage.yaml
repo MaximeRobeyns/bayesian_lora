@@ -4,7 +4,7 @@
 defaults:
   - base_config
   - opt: adamw
-  - dset: arc # boolq
+  - dset: arc
   - llm: phi
   - override llm/peft: lora # unused if use_peft: None
   - override llm/quantization: 4bit
@@ -18,7 +18,7 @@ log_level: INFO # DEBUG | INFO | WARN | ERROR | CRITICAL
 # Whether to (re)-run each of the steps (MAP training, log likelihood
 # calculation, Kronecker factor calculation, marginal likelihood tuning and
 # linearized prediction), or use existing checkpoints if present.
-run_every_step: false
+run_every_step: true
 
 # Print this configuration at the start
 print_config: false
@@ -54,7 +54,7 @@ seed: null
 
 # Dataset configuration overrides
 dset:
-  train_bs: 5 # 12
+  train_bs: 6 # 12
   eval_bs: 4
   train_subset: -1 # 250
 
