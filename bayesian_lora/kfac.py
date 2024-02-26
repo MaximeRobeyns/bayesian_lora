@@ -154,7 +154,7 @@ def disable_input_hooks():
 
 def save_input_hook(
     module_name: str,
-    activations: dict[str, activation_t],
+    activations: dict[str, tuple[activation_t, bool]],
     n_kfac: int | None,
     lr_threshold: int,
     has_bias: bool = False,
@@ -168,7 +168,7 @@ def save_input_hook(
             modules themselves can be hashed, this makes the Kronecker factors
             more portable.
         activations: mapping from layer / module name to input activation
-            Kronecker factor
+            Kronecker factor, and a flag indicating whether it is low-rank
         n_kfac: the rank we use if we're using a low rank appproximation to
             this Kronecker factor
         lr_threshold: if the side length `l_in+1` exceeds this threshold, and
@@ -193,25 +193,26 @@ def save_input_hook(
             # batch, then sum along batch dim:
             A = (a[..., None] @ a[:, None]).sum(0)
             if module_name not in activations.keys():
-                activations[module_name] = A
+                activations[module_name] = A, False
             else:
-                activations[module_name] += A
+                A_tmp = activations[module_name][0]
+                activations[module_name] = A_tmp + A, False
         else:
             if module_name not in activations.keys():
                 # Initialise a correctly sized matrix of 0s
-                activations[module_name] = t.zeros(
-                    a.size(-1), n_kfac, device=a.device, dtype=svd_dtype
+                activations[module_name] = (
+                    t.zeros(a.size(-1), n_kfac, device=a.device, dtype=svd_dtype),
+                    True,
                 )
-            activations[module_name] = incremental_svd(
-                activations[module_name], a, svd_dtype, n_kfac
-            )
+            A = incremental_svd(activations[module_name][0], a, svd_dtype, n_kfac)
+            activations[module_name] = A, True
 
     return input_hook
 
 
 def save_output_grad_hook(
     module_name: str,
-    output_grads: dict[str, outgrad_t],
+    output_grads: dict[str, tuple[outgrad_t, bool]],
     n_kfac: int | None,
     lr_threshold: int,
     svd_dtype: t.dtype = t.float64,
@@ -224,7 +225,7 @@ def save_output_grad_hook(
             While modules themselves can be hashed, this makes the Kronecker
             factors more portable.
         output_grads: mapping from layer / module name to the output gradient
-            Kronecker factor.
+            Kronecker factor, and a flag indicating whether it is low-rank.
         n_kfac: the rank we use if we're using a low rank appproximation to
             this Kronecker factor
         lr_threshold: if the side length `l_in+1` exceeds this threshold, and
@@ -247,27 +248,28 @@ def save_output_grad_hook(
             # l_out] tensor.
             S = (s[..., None] @ s[:, None]).sum(0)
             if module_name not in output_grads.keys():
-                output_grads[module_name] = S
+                output_grads[module_name] = S, False
             else:
-                output_grads[module_name] += S
+                S_tmp = output_grads[module_name][0]
+                output_grads[module_name] = S_tmp + S, False
         else:
             # Never reach this branch if n_kfac is None
             if module_name not in output_grads.keys():
                 # Initialise a correctly sized matrix of 0s
-                output_grads[module_name] = t.zeros(
-                    s.size(-1), n_kfac, device=s.device, dtype=s.dtype
+                output_grads[module_name] = (
+                    t.zeros(s.size(-1), n_kfac, device=s.device, dtype=s.dtype),
+                    True,
                 )
-            output_grads[module_name] = incremental_svd(
-                output_grads[module_name], s, svd_dtype, n_kfac
-            )
+            S = incremental_svd(output_grads[module_name][0], s, svd_dtype, n_kfac)
+            output_grads[module_name] = S, True
 
     return output_grad_hook
 
 
 def register_hooks(
     model: nn.Module,
-    activations: dict[str, activation_t],
-    output_grads: dict[str, outgrad_t],
+    activations: dict[str, tuple[activation_t, bool]],
+    output_grads: dict[str, tuple[outgrad_t, bool]],
     target_module_keywords: list[str],
     n_kfac: int | None = 10,
     lr_threshold: int = 100,
@@ -278,15 +280,16 @@ def register_hooks(
     Args:
         model: the ``nn.Module`` on which to attach the hooks (usually the full
             model)
-        activations: dictionary in which to store the parameter activations.
+        activations: dictionary in which to store the parameter activations and
+            flag indicating whether this factor is low-rank.
             The side length is ``l_in`` (i.e. equal to the number of input
             features in layer ``l``), or ``l_in + 1`` if there is a bias. The
             last dimension is ``n_kfac`` if ``l_in >= lr_threshold``.
-        output_grads: dictionary in which to store the output gradients. The
-            side length ``l_out`` is equal to the number of output features of
-            layer ``l`` (regardless of the presence of a bias; unlike the
-            activations). The last dimension is ``n_kfac`` if ``l_out >=
-            lr_threshold``
+        output_grads: dictionary in which to store the output gradients and a
+            flag indicating whether this factor is low-rank. The side length
+            ``l_out`` is equal to the number of output features of layer ``l``
+            (regardless of the presence of a bias; unlike the activations). The
+            last dimension is ``n_kfac`` if ``l_out >= lr_threshold``
         target_module_keywords: a list of the network modules to include in the
             GGN. Note, only nn.Linear layers are currently supported.
         n_kfac: the rank we use to approximate large Kronecker factors. If set
@@ -359,7 +362,7 @@ def calculate_kronecker_factors(
             distribution, as a ``Tensor``. Usually this contains the logits
             over each class label.
         loader: a data loader for the dataset with which to calculate the
-            curvature / Kronecker factors
+            curvature / Kronecker factors.
         n_kfac: an optional integer rank to use for a low-rank approximation of
             large Kronecker factors. If this is ``None``, then no low-rank
             approximations are used.
@@ -376,6 +379,11 @@ def calculate_kronecker_factors(
     Warning:
         This function has only been implemented for nn.Linear. Models
         implemented using Conv1D (e.g. GPT2) will sadly not work for now.
+
+    Warning:
+        Your data loader should not have a partial final batch, since this will
+        result in an incorrect expectation. You can drop the final batch with
+        `drop_last=True` in a standard PyTorch DataLoader.
 
     Examples:
 
@@ -400,8 +408,8 @@ def calculate_kronecker_factors(
     """
     model = model.train()
 
-    activations: dict[str, t.Tensor] = dict()
-    output_grads: dict[str, t.Tensor] = dict()
+    activations: dict[str, tuple[t.Tensor, bool]] = dict()
+    output_grads: dict[str, tuple[t.Tensor, bool]] = dict()
 
     hooks = register_hooks(
         model,
@@ -422,7 +430,10 @@ def calculate_kronecker_factors(
             sampled_ys = t.multinomial(logits.softmax(-1), 1).view(-1)
 
         # TODO: support other model distributions
-        pullback_loss = F.cross_entropy(logits, sampled_ys, reduction="sum")
+        # We use the mean reduction here to keep the magnitude of the output
+        # gradients invariant to the batch size used when calculating the
+        # Kronecker factors.
+        pullback_loss = F.cross_entropy(logits, sampled_ys, reduction="mean")
 
         with disable_input_hooks():
             pullback_loss.backward()
@@ -431,8 +442,13 @@ def calculate_kronecker_factors(
 
     remove_hooks(hooks)
     factors: KFAC_t = dict()
-    for k, A in activations.items():
-        S = output_grads[k]
-        factors[k] = (A / len(loader), S / len(loader))
+    for k, (A, A_lr) in activations.items():
+        S, S_lr = output_grads[k]
+        # Average only the non low-rank factors.
+        if not S_lr:
+            S = S / len(loader)
+        if not A_lr:
+            A = A / len(loader)
+        factors[k] = A, S
 
     return factors

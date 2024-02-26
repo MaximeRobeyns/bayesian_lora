@@ -114,6 +114,7 @@ class ClassificationDataset:
         subset_size: int = -1,
         subset_seed: int = 42,
         grad_acc_steps: int = 1,
+        drop_last: bool = True,
         **kwargs,
     ):
         if subset_size > 0:
@@ -126,7 +127,7 @@ class ClassificationDataset:
         else:
             dset = self.dset[split]
 
-        kwargs = {"batch_size": 32} | kwargs
+        kwargs = {"batch_size": 32, "drop_last": drop_last} | kwargs
         assert (
             kwargs["batch_size"] % grad_acc_steps == 0
         ), "batch size must be divisible by gradient accumulation steps"
