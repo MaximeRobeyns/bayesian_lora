@@ -26,7 +26,7 @@ mypy:  ## Run static type checking
 	@mypy
 
 lab:  ## To start a Jupyter Lab server
-	jupyter lab --notebook-dir=notebooks
+	@python -m jupyter lab --notebook-dir=notebooks
 
 kernel:  ## To setup a Jupyter kernel to run notebooks in the project's virtual env
 	python -m ipykernel install --user --name bayesian_lora \

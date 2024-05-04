@@ -18,7 +18,7 @@ model_kwargs:
 global_gen_kwargs: {}
 
 add_space: false
-is_s2s: false
+is_sc: false
 
 use_peft: false
 peft:

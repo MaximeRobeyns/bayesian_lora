@@ -42,7 +42,7 @@ we'll handle the outputs from the wrapped network call.
    .. code-block:: py
 
        jacobian, f_mu = jacobian_mean(
-           model, batch_inputs, target_ids=dset.target_ids, is_s2s=False
+           model, batch_inputs, target_ids=dset.target_ids, is_sc=False
        )
 
 2. **Custom output callback** Here, we allow the user to provide a callback
@@ -52,7 +52,7 @@ we'll handle the outputs from the wrapped network call.
    .. code-block:: py
 
        def default_output_callback(outputs: ModelOutput) -> Tensor:
-          logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
+          logits = outputs.logits if cfg.llm.is_sc else outputs.logits[:, -1]
           target_logits = logits[:, dset.target_ids]
           return target_logits
 

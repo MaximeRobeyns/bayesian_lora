@@ -1,5 +1,5 @@
-name: gpt2
-model_name_or_path: gpt2
+name: RoBERTa
+model_name_or_path: FacebookAI/roberta-base
 
 config_class: AutoConfig
 config_kwargs: {}
@@ -10,19 +10,19 @@ tokenizer_kwargs:
 
 tokenizer_special_tokens: {}
 
-model_class: AutoModelForCausalLM
+model_class: AutoModelForSequenceClassification
 model_kwargs:
   torch_dtype: bfloat16 # auto
 
 # Global HF generation configurations
 global_gen_kwargs: {}
 
-add_space: true
-is_sc: false
+add_space: true # TODO: verify this
+is_sc: true
 
 use_peft: false
 peft:
-  target_modules: ["c_attn", "c_proj", "c_fc", "lm_head"]
+  target_modules: ["query", "value", "dense"]
 
 use_quant: false
 

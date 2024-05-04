@@ -166,7 +166,7 @@ def default_output_callback(outputs: ModelOutput) -> Tensor:
     be all the logits.
     """
     # Get the last token for CausalLM
-    logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
+    logits = outputs.logits if cfg.llm.is_sc else outputs.logits[:, -1]
     # Select the logits corresponding to our target classes
     target_logits = logits[:, dset.target_ids]
     return target_logits
@@ -176,7 +176,7 @@ def jacobian_mean(
     model: nn.Module,
     batch_inputs: BatchEncoding,
     target_ids: Tensor | None = None,
-    is_s2s: bool = False,
+    is_sc: bool = False,
     output_callback: Callable[[ModelOutput], Tensor] | None = None,
 ) -> tuple[dict[str, Tensor], Tensor]:
     """Calculates the Jacobian and logit means
@@ -188,8 +188,8 @@ def jacobian_mean(
         target_ids: selects specific model outputs. Leave this as None if
             either a) you wish to consider all model outputs or b) you are
             providing an output_callback to post-process the model output.
-        is_s2s: whether this is an s2s model. Can omit if providing an
-            output_callback
+        is_sc: whether this is a sequence classification model. Can omit if
+            providing an output_callback
         output_callback: a function that takes the results of
             ``model(**batch_inputs)`` and returns the logits of interest
     Returns:
@@ -200,7 +200,7 @@ def jacobian_mean(
     if output_callback is None:
 
         def ocb(outputs: ModelOutput) -> Tensor:
-            logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
+            logits = outputs.logits if cfg.llm.is_sc else outputs.logits[:, -1]
             if target_ids is not None:
                 logits = logits[:, target_ids]
             return logits

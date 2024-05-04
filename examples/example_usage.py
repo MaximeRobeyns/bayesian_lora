@@ -71,7 +71,7 @@ def main(cfg: DictConfig):
     # 3. Do MAP training
     #
     train_loader = dset.loader(
-        is_s2s=cfg.llm.is_s2s,  # sequence to sequence model?
+        is_sc=cfg.llm.is_sc,  # sequence to sequence model?
         batch_size=cfg.dset.train_bs,  # training batch size
         split=cfg.dset.train_split,  # training split name in dset
         subset_size=cfg.dset.train_subset,  # train on subset? (-1 = no subset)
@@ -91,7 +91,9 @@ def main(cfg: DictConfig):
         logging.info("Training MAP parameters")
         while grad_steps < cfg.train_steps:
             epoch += 1
-            logging.info(f"Beginning epoch {epoch} ({grad_steps} / {cfg.train_steps})")
+            logging.info(
+                f"Beginning epoch {epoch} (step {grad_steps} of {cfg.train_steps})"
+            )
             for batch in tqdm(train_loader, disable=not cfg.use_tqdm, file=sys.stdout):
                 opt.zero_grad()
                 prompts, classes, _ = batch
@@ -122,7 +124,7 @@ def main(cfg: DictConfig):
     if not os.path.exists(ll_path) or cfg.run_every_step:
         logging.info("Evaluating the MAP log likelihood")
         val_loader = dset.loader(
-            is_s2s=cfg.llm.is_s2s,
+            is_sc=cfg.llm.is_sc,
             batch_size=cfg.dset.eval_bs,
             split=cfg.dset.eval_split,
             subset_size=cfg.dset.eval_subset,
@@ -153,7 +155,7 @@ def main(cfg: DictConfig):
         outputs = model(**inputs)
         logits = (
             outputs.logits[:, dset.target_ids.squeeze(-1)]
-            if cfg.llm.is_s2s
+            if cfg.llm.is_sc
             else outputs.logits[:, -1, dset.target_ids.squeeze(-1)]
         )
         logits = logits.softmax(-1)
@@ -223,7 +225,7 @@ def main(cfg: DictConfig):
     model = model.to(device)
 
     val_loader = dset.loader(
-        is_s2s=cfg.llm.is_s2s,
+        is_sc=cfg.llm.is_sc,
         batch_size=cfg.dset.eval_bs,
         split=cfg.dset.eval_split,
         subset_size=cfg.dset.eval_subset,
@@ -247,7 +249,7 @@ def main(cfg: DictConfig):
         be all the logits.
         """
         # Get the last token for CausalLM
-        logits = outputs.logits if cfg.llm.is_s2s else outputs.logits[:, -1]
+        logits = outputs.logits if cfg.llm.is_sc else outputs.logits[:, -1]
         # Select the logits corresponding to our target classes
         target_logits = logits[:, dset.target_ids.squeeze(-1)]
         return target_logits

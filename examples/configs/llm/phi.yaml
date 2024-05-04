@@ -16,13 +16,13 @@ model_kwargs:
   torch_dtype: auto
   trust_remote_code: true
   # attn_implementation: sdpa
-  # attn_implementation: "flash_attention_2"
+  attn_implementation: "flash_attention_2"
 
 # Global HF generation configurations
 global_gen_kwargs: {}
 
 add_space: false
-is_s2s: false
+is_sc: false
 
 use_peft: false
 peft:

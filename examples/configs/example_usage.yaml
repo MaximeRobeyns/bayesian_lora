@@ -19,7 +19,7 @@ log_level: INFO # DEBUG | INFO | WARN | ERROR | CRITICAL
 # Whether to (re)-run each of the steps (MAP training, log likelihood
 # calculation, Kronecker factor calculation, marginal likelihood tuning and
 # linearized prediction), or use existing checkpoints if present.
-run_every_step: false
+run_every_step: true
 
 # Print this configuration at the start
 print_config: false
@@ -29,7 +29,7 @@ use_tqdm: true
 
 # MAP training parameters
 map_lr: 5e-5
-train_steps: 1000
+train_steps: 10
 
 # The rank used for the large Kronecker factors
 n_kfac: 10
