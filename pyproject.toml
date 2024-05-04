@@ -41,6 +41,7 @@ examples = [
     "torchmetrics>=1.2.0",
     "transformers>=4.37.2",
     "pytest>=7.2.0",
+    "bitsandbytes",
 ]
 # Other miscellaneous dev tools
 dev = [

@@ -38,10 +38,13 @@ def calc_M(
     n_kfac: int,
     s2: t.Tensor,
     return_LB: bool = False,
-) -> t.Tensor | tuple[
-    Float[Tensor, "n_lora_x_n_kfac n_lora_x_n_kfac"],
-    tuple[Float[Tensor, "n_lora n_lora"], Float[Tensor, "d n_kfac"]] | None,
-]:
+) -> (
+    t.Tensor
+    | tuple[
+        Float[Tensor, "n_lora_x_n_kfac n_lora_x_n_kfac"],
+        tuple[Float[Tensor, "n_lora n_lora"], Float[Tensor, "d n_kfac"]] | None,
+    ]
+):
     """
     Calculates the `M` matrix in Eq. 32 of https://openreview.net/forum?id=FJiUyzOF1m
 
@@ -131,7 +134,7 @@ def model_evidence(
     logdet = t.tensor(0.0)
     d = 1
 
-    for (A, S) in factors.values():
+    for A, S in factors.values():
         d = max(A.shape + S.shape)
 
         M = calc_M(A, S, n_lora, n_kfac, s2)
@@ -278,7 +281,7 @@ def variance(
         ), f"Could not find weight corresponding to kronecker factor {k}"
         # ---------------------------------------------------------------------
 
-        G = jacobian.get(g_key).squeeze()
+        G = jacobian.get(g_key).squeeze().to(device)
         # Ensure that G is [batch, n_logits, d, n_lora] sized at all times
         if G.shape[-1] != n_lora:
             G = G.mT
@@ -298,7 +301,7 @@ def variance(
 
         B_expanded = B.mT[None, None, :]  # [1, 1, n_kfc, d]
         L_expanded = L[None, None, :]  # [1, 1, n_lora, n_lora]
-        BGL = B_expanded @ G @ L_expanded
+        BGL = B_expanded @ G.to(dtype=B.dtype) @ L_expanded
         BGL_vec = BGL.flatten(-2).to(dtype=t.float64)  # [batch, n_logits, M_size]
         term_2 = s2.pow(2.0) * BGL_vec @ t.linalg.inv(M) @ BGL_vec.mT
         assert term_2.shape == (batch_size, n_logits, n_logits)

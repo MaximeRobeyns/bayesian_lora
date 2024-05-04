@@ -276,8 +276,6 @@ def main(cfg: DictConfig):
                 cfg.n_kfac,
                 device,
             )
-            print(f"f_var shape: {f_var.shape}")
-
             pred_var.append(f_var.clone().cpu())
 
             # Sample logits from a Gaussian parametrised by f_mu, f_var

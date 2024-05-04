@@ -100,15 +100,15 @@ def incremental_svd(
 
 # Datatype for Kronecker factors. l_in, l_out refers to the number of input and
 # output features of layer l in the network, respectively. Note, if the layer
-# has a bias, then l_in will in fact bt l_in + 1.
+# has a bias, then l_in will in fact be l_in + 1.
 activation_t = Float[Tensor, "l_in l_in_or_n_kfac"]
 outgrad_t = Float[Tensor, "l_out l_out_or_n_kfac"]
 KFAC_t = dict[str, tuple[activation_t, outgrad_t]]
 
 # We add hooks to the nn.Module (e.g. AutoModelForCausalLM, PeftModel, etc) to
 # keep track of each layer's input activations and output gradients.
-# The following context managers let you enable / disable them without removing
-# them.
+# The following context managers let you enable / disable these hooks without
+# removing them.
 _hooks_enabled: bool = True
 _input_hooks_disabled: bool = False
 
@@ -165,14 +165,15 @@ def save_input_hook(
 
     Args:
         module_name: name used as a key for the 'activations' dictionary. While
-            modules themselves can be hashed, this makes the Kronecker factors
-            more portable.
-        activations: mapping from layer / module name to input activation
-            Kronecker factor, and a flag indicating whether it is low-rank
+            torch modules themselves can be hashed, using a string here makes
+            the Kronecker factors more portable.
+        activations: a mapping from layer / module name to input activation
+            Kronecker factor, and a boolean flag indicating whether it is
+            low-rank
         n_kfac: the rank we use if we're using a low rank appproximation to
             this Kronecker factor
         lr_threshold: if the side length `l_in+1` exceeds this threshold, and
-            n_kfac is not none, treat the factor as low-rank
+            n_kfac is not None, then treat the factor as low-rank
         has_bias: does this layer have a bias?
         svd_dtype: dtype to cast tensors to for SVD calculations
     """

@@ -54,9 +54,10 @@ def setup_model_kwargs(
         if "dtype" in k.lower() and v != "auto":
             model_kwargs[k] = str_to_torch_dtype(v)
         if "attn_implementation" in k.lower():
-            model_kwargs[k] = (
-                "flash_attention_2" if is_flash_attn_2_available() else "sdpa"
-            )
+            if v == "flash_attention_2":
+                model_kwargs[k] = (
+                    "flash_attention_2" if is_flash_attn_2_available() else "sdpa"
+                )
     if use_quant and quantization is not None:
         model_kwargs["quantization_config"] = instantiate(quantization)
     return model_kwargs
@@ -120,9 +121,11 @@ def setup_llm(
         tokenizer_kwargs = OmegaConf.to_object(tokenizer_kwargs)
     tokenizer = tokenizer_cls.from_pretrained(model_name_or_path, **tokenizer_kwargs)
     tokenizer_special_tokens = {
-        k: getattr(tokenizer, v.split(".")[-1])
-        if isinstance(v, str) and v.startswith("tokenizer")
-        else v
+        k: (
+            getattr(tokenizer, v.split(".")[-1])
+            if isinstance(v, str) and v.startswith("tokenizer")
+            else v
+        )
         for k, v in tokenizer_special_tokens.items()
     }
     if len(tokenizer_special_tokens) > 0:
