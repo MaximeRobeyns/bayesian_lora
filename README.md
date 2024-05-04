@@ -2,7 +2,7 @@
 
 Code for the paper [Bayesian Low-Rank Adaptation for Large Language Models](https://openreview.net/forum?id=FJiUyzOF1m).
 
-See the explanatory [blog post](https://maximerobeyns.com/bayesian_lora) and [documentation](https://maximerobeyns.github.io/bayesian_lora/).
+See the explanatory [blog post](https://maximerobeyns.com/bayesian_lora) and [documentation](https://maximerobeyns.github.io/bayesian_lora/) for more information.
 
 ## Installation
 
@@ -53,13 +53,14 @@ factors = calculate_kronecker_factors(
     train_loader,     # Your training data loader
     cfg.n_kfac,       # (Optional) rank to use
     cfg.lr_threshold, # (Optional) threshold for low-rank approximation
-    ["lora"],         # modules to target
+    ["lora"],         # (Optional) modules to target; defaults to all modules
     use_tqdm=True,    # (Optional) use tqdm for progress bar
 )
 ```
 In the above, the `["lora"]` argument contains a case-insensitive list of
-keywords to identify modules to target. Since we're working with a LoRa model,
-we choose `"lora"` to target (e.g. `layers.0.q_proj.lora_A`, etc).
+keywords to identify modules to target. Since we're working with a LoRA model,
+we choose `"lora"` to target LoRA modules, for instance
+`layers.0.q_proj.lora_A`.
 
 The `factors` are a dictionary with keys being the full name of the targetted
 modules, and a tuple of two tensors as the values: the first being the
