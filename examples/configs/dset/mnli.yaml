@@ -6,3 +6,4 @@ eval_bs: 32
 eval_split: validation_matched
 eval_subset: 500
 max_length: 1024
+n_labels: 3

@@ -24,10 +24,14 @@ except NameError:
     _SETUP = True
 
 
-# In[3]:
+# In[27]:
 
 
 import torch
+import matplotlib.pyplot as plt
+import torch.nn.functional as F
+
+from tqdm.notebook import tqdm
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 
@@ -42,8 +46,7 @@ get_ipython().run_line_magic('autoreload', '2')
 # In[5]:
 
 
-tokenizer = AutoTokenizer.from_pretrained(model_id)
-model = AutoModelForSequenceClassification.from_pretrained(model_id)
+tokenizer = AutoTokenizer.from_pretrained(model_id, padding_side="left")
 
 
 # Example dataset usage
@@ -51,42 +54,147 @@ model = AutoModelForSequenceClassification.from_pretrained(model_id)
 # In[6]:
 
 
-dset_class: dsets.ClassificationDataset = getattr(dsets, "cola")
+dset_class: dsets.ClassificationDataset = getattr(dsets, "boolq")
 dset = dset_class(tokenizer, add_space=True, max_len=50)
 
 
 # In[7]:
 
 
-sc_loader = dset.loader(is_sc=True, drop_last=False)
+print(f"The dataset has {dset.n_labels} labels")
 
 
-# In[12]:
+# # Single-label classification example
+
+# In[ ]:
 
 
-for (prompts, classes, _) in sc_loader:
-    ps = tokenizer.batch_decode(prompts['input_ids'])
-    for p in ps:
-        print(p)
-    break
+import torch
+from transformers import AutoTokenizer, RobertaForSequenceClassification
+
+tokenizer = AutoTokenizer.from_pretrained("cardiffnlp/twitter-roberta-base-emotion")
+model = RobertaForSequenceClassification.from_pretrained("cardiffnlp/twitter-roberta-base-emotion")
+
+inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
+
+with torch.no_grad():
+    logits = model(**inputs).logits
+
+predicted_class_id = logits.argmax().item()
+model.config.id2label[predicted_class_id]
+
+# To train a model on `num_labels` classes, you can pass `num_labels=num_labels` to `.from_pretrained(...)`
+num_labels = len(model.config.id2label)
+model = RobertaForSequenceClassification.from_pretrained("cardiffnlp/twitter-roberta-base-emotion", num_labels=num_labels)
+
+labels = torch.tensor([1])
+loss = model(**inputs, labels=labels).loss
+round(loss.item(), 2)
+
+
+# In[ ]:
+
+
+import torch
+from transformers import AutoTokenizer, BertForSequenceClassification
+
+model_id = "google/bert-base-uncased"
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+model = BertForSequenceClassification.from_pretrained(model_id)
+
+inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
+
+with torch.no_grad():
+    logits = model(**inputs).logits
+
+predicted_class_id = logits.argmax().item()
+model.config.id2label[predicted_class_id]
+
+# To train a model on `num_labels` classes, you can pass `num_labels=num_labels` to `.from_pretrained(...)`
+num_labels = len(model.config.id2label)
+model = BertForSequenceClassification.from_pretrained("textattack/bert-base-uncased-yelp-polarity", num_labels=num_labels)
+
+labels = torch.tensor([1])
+loss = model(**inputs, labels=labels).loss
+round(loss.item(), 2)
 
 
 # ## Sequence Classification (single label)
 
-# In[13]:
+# In[8]:
 
 
-tokenizer = AutoTokenizer.from_pretrained(model_id)
-model = AutoModelForSequenceClassification.from_pretrained(model_id)
+model = AutoModelForSequenceClassification.from_pretrained(
+    model_id,
+    # low_cpu_mem_usage=True,
+    torch_dtype=t.bfloat16,
+    num_labels=dset.n_labels,
+)
 
 
-# In[14]:
+# In[24]:
 
 
-model
+model = model.to(0).train()
+opt = t.optim.AdamW(model.parameters(), lr=5e-4)
 
 
-# In[35]:
+# In[25]:
+
+
+loader = dset.loader(is_sc=True)
+
+
+# In[34]:
+
+
+def class_to_label(classes, num_labels):
+    # dset.n_labels
+    problem_type="multi_label_classification"
+
+    labels = t.sum(
+        F.one_hot(classes[:, None], num_classes=num_labels), dim=1
+    ).to(torch.float)
+    return labels
+
+
+# In[ ]:
+
+
+loss = model(**inputs, labels=labels).loss
+
+
+# In[40]:
+
+
+losses = []
+for epoch in range(1):
+    for batch in tqdm(loader):
+        prompts, classes, _ = batch
+        inputs = tokenizer(prompts, return_tensors="pt", padding=True).to(0)
+        # labels = class_to_label(classes, dset.n_labels).to(0)
+        outputs = model(**inputs, labels=classes)
+        opt.zero_grad()
+        outputs.loss.backward()
+        opt.step()
+        break
+
+
+# In[ ]:
+
+
+test_loader = dset.loader(is_sc=True, split="test")
+for batch in test_loader:
+    prompts, classes, _ = batch
+    inputs = tokenizer(prompts, return_tensors="pt", padding=True).to(0)
+    outputs = model(**inputs, labels=classes.to(0))
+    predicted_class_ids = outputs.logits.argmax(0).item()
+    print(predicted_class_ids)
+    model.config.id2label[predicted_class_ids]
+    break
+
+
+# In[ ]:
 
 
 inputs = tokenizer("Hello, this is my dog, Java. Woof.", return_tensors="pt")
@@ -135,15 +243,11 @@ model = AutoModelForSequenceClassification.from_pretrained(
 inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
 
 
-# In[50]:
+# In[51]:
 
 
 with torch.no_grad():
     logits = model(**inputs).logits
-
-
-# In[51]:
-
 
 predicted_class_ids = torch.arange(0, logits.shape[-1])[torch.sigmoid(logits).squeeze(dim=0) > 0.5]
 

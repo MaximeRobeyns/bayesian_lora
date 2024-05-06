@@ -13,11 +13,13 @@ tokenizer_special_tokens: {}
 model_class: AutoModelForSequenceClassification
 model_kwargs:
   torch_dtype: bfloat16 # auto
+  attn_implementation: "flash_attention_2"
+  problem_type: multi_label_classification
 
 # Global HF generation configurations
 global_gen_kwargs: {}
 
-add_space: true # TODO: verify this
+add_space: true
 is_sc: true
 
 use_peft: false
