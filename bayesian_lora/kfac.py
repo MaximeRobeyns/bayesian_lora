@@ -237,7 +237,6 @@ def save_output_grad_hook(
     def output_grad_hook(_module: nn.Module, _, out_pos_grad: tuple[Tensor]) -> None:
         if not _hooks_enabled:
             return
-
         # Select the gradient of the first positional output of this layer,
         # then the last token in the token sequence [:, -1]. `s` should be a
         # [batch, l_out] tensor.
@@ -427,14 +426,21 @@ def calculate_kronecker_factors(
         logits = forward_call(model, batch)
         assert logits.dim() == 2
 
-        with t.no_grad():
-            sampled_ys = t.multinomial(logits.softmax(-1), 1).view(-1)
-
-        # TODO: support other model distributions
-        # We use the mean reduction here to keep the magnitude of the output
-        # gradients invariant to the batch size used when calculating the
-        # Kronecker factors.
-        pullback_loss = F.cross_entropy(logits, sampled_ys, reduction="mean")
+        # TODO: support other model distributions.
+        # We use the mean reduction here in the losses to keep the magnitude of
+        # the output gradients invariant to the batch size used when
+        # calculating the Kronecker factors.
+        if logits.size(-1) == 1:
+            # We are dealing with binary outputs
+            with t.no_grad():
+                sampled_ys = t.bernoulli(logits.sigmoid()).view(-1)
+            pullback_loss = F.binary_cross_entropy_with_logits(
+                logits.squeeze(-1), sampled_ys, reduction="mean"
+            )
+        else:
+            with t.no_grad():
+                sampled_ys = t.multinomial(logits.softmax(-1), 1).view(-1)
+            pullback_loss = F.cross_entropy(logits, sampled_ys, reduction="mean")
 
         with disable_input_hooks():
             pullback_loss.backward()
@@ -447,9 +453,9 @@ def calculate_kronecker_factors(
         S, S_lr = output_grads[k]
         # Average only the non low-rank factors.
         if not S_lr:
-            S = S / len(loader)
+            S /= len(loader)
         if not A_lr:
-            A = A / len(loader)
+            A /= len(loader)
         factors[k] = A, S
 
     return factors
