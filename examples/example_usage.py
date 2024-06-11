@@ -136,7 +136,7 @@ def main(cfg: DictConfig):
                 inputs = tokenizer(prompts, **cfg.tokenizer_run_kwargs).to(device)
                 logits = model(**inputs).logits[:, -1, dset.target_ids.squeeze(-1)]
                 probs = logits.softmax(-1)
-                LL += probs.gather(1, classes[:, None].to(device)).sum()
+                LL += probs.gather(1, classes[:, None].to(device)).log().sum()
         t.save(LL, ll_path)
     else:
         logging.info(f"Loading LL from {ll_path}")
