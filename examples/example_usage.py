@@ -287,7 +287,7 @@ def main(cfg: DictConfig):
             L = L.expand(samples, *L.shape)
             eps = t.randn_like(f_mu).unsqueeze(-1)
             logits = f_mu[..., None] + L @ eps
-            logits = logits.squeeze(-1).softmax(-1).mean(0)
+            logits = logits.squeeze(-1).mean(0)
 
             pred_logits.append(logits.cpu())
             total_loss += F.cross_entropy(logits, classes).item()
