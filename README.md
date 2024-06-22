@@ -130,7 +130,7 @@ with t.no_grad():
         f_mu = f_mu.expand(samples, *f_mu.shape)
         L = L.expand(samples, *L.shape)
         eps = t.randn_like(f_mu)
-        logits = (f_mu + L @ eps).squeeze(-1).softmax(-1).mean(0)
+        logits = (f_mu + L @ eps).squeeze(-1).mean(0)
 ```
 
 The above is a minimal example; see [this
